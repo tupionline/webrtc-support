@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Customer – Support Camera</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; font-family: system-ui, sans-serif; }
+
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #local-video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+      /* Mirror for front cam, but we're using rear — no flip needed */
+    }
+
+    #pointer-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    #status {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      padding: 6px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: blur(6px);
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #888;
+      flex-shrink: 0;
+    }
+    .dot.waiting  { background: #f59e0b; animation: blink 1.4s infinite; }
+    .dot.connected { background: #22c55e; }
+    .dot.error    { background: #ef4444; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.25; }
+    }
+
+    #hint {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 12px;
+      text-align: center;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <video id="local-video" autoplay playsinline muted></video>
+    <canvas id="pointer-canvas"></canvas>
+
+    <div id="status">
+      <div class="dot waiting" id="status-dot"></div>
+      <span id="status-text">Starting camera…</span>
+    </div>
+
+    <div id="hint">Point the camera at what you need help with</div>
+  </div>
+
+  <script>
+    const video  = document.getElementById('local-video');
+    const canvas = document.getElementById('pointer-canvas');
+    const ctx    = canvas.getContext('2d');
+    const dot    = document.getElementById('status-dot');
+    const label  = document.getElementById('status-text');
+
+    let pc      = null;
+    let pointer = null; // { x, y } normalised 0‑1
+
+    // ── Canvas sizing ────────────────────────────────────────────────────────
+    function resize() {
+      canvas.width  = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // ── Status helper ────────────────────────────────────────────────────────
+    function setStatus(state, text) {
+      dot.className = 'dot ' + state;
+      label.textContent = text;
+    }
+
+    // ── Video layout (object-fit: contain) ───────────────────────────────────
+    function videoBounds() {
+      const vw = video.videoWidth  || canvas.width;
+      const vh = video.videoHeight || canvas.height;
+      const ew = canvas.width, eh = canvas.height;
+      const vr = vw / vh, er = ew / eh;
+      let w, h, x, y;
+      if (vr > er) { w = ew; h = ew / vr; x = 0;           y = (eh - h) / 2; }
+      else         { h = eh; w = eh * vr;  y = 0;           x = (ew - w) / 2; }
+      return { x, y, w, h };
+    }
+
+    // ── AR pointer animation ─────────────────────────────────────────────────
+    (function drawLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (pointer) {
+        const b  = videoBounds();
+        const px = b.x + pointer.x * b.w;
+        const py = b.y + pointer.y * b.h;
+        const t  = Date.now() / 500;
+        const r  = 22 + Math.sin(t) * 6; // pulsing outer ring
+
+        // Shadow glow
+        ctx.shadowColor = 'rgba(239,68,68,0.6)';
+        ctx.shadowBlur  = 12;
+
+        // Outer pulsing ring
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(239,68,68,0.45)';
+        ctx.lineWidth   = 2;
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+
+        // Inner solid ring
+        ctx.beginPath();
+        ctx.arc(px, py, 10, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth   = 2.5;
+        ctx.stroke();
+
+        // Centre dot
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+
+        // Crosshair lines (gap around inner ring)
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth   = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(px - 22, py); ctx.lineTo(px - 12, py);
+        ctx.moveTo(px + 12, py); ctx.lineTo(px + 22, py);
+        ctx.moveTo(px, py - 22); ctx.lineTo(px, py - 12);
+        ctx.moveTo(px, py + 12); ctx.lineTo(px, py + 22);
+        ctx.stroke();
+      }
+
+      requestAnimationFrame(drawLoop);
+    })();
+
+    // ── Camera ───────────────────────────────────────────────────────────────
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width:  { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+      video.srcObject = stream;
+      return stream;
+    }
+
+    // ── WebRTC (answerer) ────────────────────────────────────────────────────
+    function buildPC(stream) {
+      pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+
+      // Send local camera to agent
+      stream.getTracks().forEach(t => pc.addTrack(t, stream));
+
+      pc.onicecandidate = ({ candidate }) => {
+        if (candidate) ws.send(JSON.stringify({ type: 'ice', candidate }));
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') {
+          setStatus('connected', 'Agent connected');
+        } else if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
+          setStatus('waiting', 'Waiting for agent…');
+          pointer = null;
+        }
+      };
+
+      // Receive pointer coordinates from agent via data channel
+      pc.ondatachannel = ({ channel }) => {
+        channel.onmessage = ({ data }) => {
+          try {
+            const msg = JSON.parse(data);
+            if (msg.type === 'pointer')     pointer = { x: msg.x, y: msg.y };
+            if (msg.type === 'pointer-off') pointer = null;
+          } catch {}
+        };
+      };
+
+      return pc;
+    }
+
+    // ── Signalling ───────────────────────────────────────────────────────────
+    const ws = new WebSocket(`wss://${location.host}`);
+    let stream;
+
+    ws.onopen = async () => {
+      setStatus('waiting', 'Starting camera…');
+      try {
+        stream = await startCamera();
+        setStatus('waiting', 'Waiting for agent…');
+        ws.send(JSON.stringify({ type: 'join', role: 'customer' }));
+      } catch (e) {
+        setStatus('error', 'Camera error: ' + e.message);
+      }
+    };
+
+    ws.onmessage = async ({ data }) => {
+      const msg = JSON.parse(data);
+
+      if (msg.type === 'peer-joined' && msg.role === 'agent') {
+        setStatus('waiting', 'Agent ready, connecting…');
+        // Agent will send an offer; we'll set up the PC then
+      }
+
+      if (msg.type === 'offer') {
+        if (pc) { pc.close(); pc = null; }
+        buildPC(stream);
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        ws.send(JSON.stringify({ type: 'answer', answer }));
+      }
+
+      if (msg.type === 'ice' && pc) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
+      }
+
+      if (msg.type === 'peer-left') {
+        setStatus('waiting', 'Waiting for agent…');
+        pointer = null;
+        pc?.close(); pc = null;
+      }
+    };
+
+    ws.onerror = () => setStatus('error', 'Connection error');
+    ws.onclose = () => setStatus('error', 'Disconnected — please refresh');
+  </script>
+</body>
+</html>

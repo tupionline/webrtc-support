@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent – Support Console</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0f0f0f; overflow: hidden; font-family: system-ui, sans-serif; color: #fff; }
+
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #remote-video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+      display: block;
+    }
+
+    /* Invisible layer that captures mouse/touch for pointer control */
+    #interaction-layer {
+      position: absolute;
+      inset: 0;
+      cursor: none;
+    }
+
+    #cursor-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* ── Status bar ── */
+    #status {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      padding: 6px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: blur(6px);
+      z-index: 30;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #888;
+      flex-shrink: 0;
+    }
+    .dot.waiting  { background: #f59e0b; animation: blink 1.4s infinite; }
+    .dot.connected { background: #22c55e; }
+    .dot.error    { background: #ef4444; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.25; }
+    }
+
+    #hint {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 12px;
+      text-align: center;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    /* ── Waiting overlay ── */
+    #waiting-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0f0f0f;
+      z-index: 20;
+      gap: 14px;
+      transition: opacity 0.3s;
+    }
+    #waiting-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #waiting-overlay h2 { font-size: 18px; font-weight: 500; color: #e5e5e5; }
+    #waiting-overlay p  { font-size: 13px; color: #666; }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #2a2a2a;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <video id="remote-video" autoplay playsinline></video>
+
+    <div id="interaction-layer"></div>
+    <canvas id="cursor-canvas"></canvas>
+
+    <div id="status">
+      <div class="dot waiting" id="status-dot"></div>
+      <span id="status-text">Waiting for customer…</span>
+    </div>
+
+    <div id="hint">Move mouse over the video to guide the customer</div>
+
+    <div id="waiting-overlay">
+      <div class="spinner"></div>
+      <h2>Waiting for customer</h2>
+      <p>The customer will connect shortly…</p>
+    </div>
+  </div>
+
+  <script>
+    const video   = document.getElementById('remote-video');
+    const canvas  = document.getElementById('cursor-canvas');
+    const ctx     = canvas.getContext('2d');
+    const layer   = document.getElementById('interaction-layer');
+    const dot     = document.getElementById('status-dot');
+    const label   = document.getElementById('status-text');
+    const overlay = document.getElementById('waiting-overlay');
+
+    let pc          = null;
+    let dataChannel = null;
+    let cursorPos   = null; // canvas-space { x, y }
+    let lastSend    = 0;
+
+    // ── Canvas sizing ─────────────────────────────────────────────────────────
+    function resize() {
+      canvas.width  = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // ── Status helper ─────────────────────────────────────────────────────────
+    function setStatus(state, text) {
+      dot.className   = 'dot ' + state;
+      label.textContent = text;
+    }
+
+    // ── Video layout (object-fit: contain) ────────────────────────────────────
+    function videoBounds() {
+      const vw = video.videoWidth  || canvas.width;
+      const vh = video.videoHeight || canvas.height;
+      const ew = canvas.width, eh = canvas.height;
+      const vr = vw / vh, er = ew / eh;
+      let w, h, x, y;
+      if (vr > er) { w = ew; h = ew / vr; x = 0;          y = (eh - h) / 2; }
+      else         { h = eh; w = eh * vr;  y = 0;          x = (ew - w) / 2; }
+      return { x, y, w, h };
+    }
+
+    function insideVideo(px, py) {
+      const { x, y, w, h } = videoBounds();
+      return px >= x && px <= x + w && py >= y && py <= y + h;
+    }
+
+    function toNorm(px, py) {
+      const { x, y, w, h } = videoBounds();
+      return {
+        x: Math.max(0, Math.min(1, (px - x) / w)),
+        y: Math.max(0, Math.min(1, (py - y) / h))
+      };
+    }
+
+    // ── Agent cursor drawing ──────────────────────────────────────────────────
+    (function drawLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (cursorPos && insideVideo(cursorPos.x, cursorPos.y)) {
+        const { x, y } = cursorPos;
+
+        ctx.shadowColor = 'rgba(239,68,68,0.5)';
+        ctx.shadowBlur  = 10;
+
+        // Outer ring
+        ctx.beginPath();
+        ctx.arc(x, y, 18, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(239,68,68,0.4)';
+        ctx.lineWidth   = 1.5;
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+
+        // Inner ring
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth   = 2;
+        ctx.stroke();
+
+        // Centre dot
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+
+        // Crosshair
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth   = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x - 22, y); ctx.lineTo(x - 10, y);
+        ctx.moveTo(x + 10, y); ctx.lineTo(x + 22, y);
+        ctx.moveTo(x, y - 22); ctx.lineTo(x, y - 10);
+        ctx.moveTo(x, y + 10); ctx.lineTo(x, y + 22);
+        ctx.stroke();
+      }
+
+      requestAnimationFrame(drawLoop);
+    })();
+
+    // ── Pointer sending ───────────────────────────────────────────────────────
+    function sendPointer(px, py) {
+      if (!dataChannel || dataChannel.readyState !== 'open') return;
+      if (!insideVideo(px, py)) {
+        dataChannel.send(JSON.stringify({ type: 'pointer-off' }));
+        return;
+      }
+      const now = Date.now();
+      if (now - lastSend < 33) return; // ~30 fps
+      lastSend = now;
+      const norm = toNorm(px, py);
+      dataChannel.send(JSON.stringify({ type: 'pointer', x: norm.x, y: norm.y }));
+    }
+
+    function eventPos(e) {
+      const r = canvas.getBoundingClientRect();
+      const src = e.touches ? e.touches[0] : e;
+      return { x: src.clientX - r.left, y: src.clientY - r.top };
+    }
+
+    layer.addEventListener('mousemove', (e) => {
+      cursorPos = eventPos(e);
+      sendPointer(cursorPos.x, cursorPos.y);
+    });
+
+    layer.addEventListener('mouseleave', () => {
+      cursorPos = null;
+      dataChannel?.readyState === 'open' &&
+        dataChannel.send(JSON.stringify({ type: 'pointer-off' }));
+    });
+
+    layer.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      cursorPos = eventPos(e);
+      sendPointer(cursorPos.x, cursorPos.y);
+    }, { passive: false });
+
+    layer.addEventListener('touchend', () => {
+      cursorPos = null;
+      dataChannel?.readyState === 'open' &&
+        dataChannel.send(JSON.stringify({ type: 'pointer-off' }));
+    });
+
+    // ── WebRTC (offerer) ──────────────────────────────────────────────────────
+    function buildPC() {
+      pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+
+      // Tell the SDP we want to receive the customer's video track
+      pc.addTransceiver('video', { direction: 'recvonly' });
+
+      // Unreliable, unordered channel — best for real-time pointer (drop stale coords)
+      dataChannel = pc.createDataChannel('pointer', { ordered: false, maxRetransmits: 0 });
+      dataChannel.onopen  = () => console.log('data channel open');
+      dataChannel.onclose = () => console.log('data channel closed');
+
+      pc.ontrack = ({ streams }) => {
+        video.srcObject = streams[0];
+        overlay.classList.add('hidden');
+        setStatus('connected', 'Customer connected');
+      };
+
+      pc.onicecandidate = ({ candidate }) => {
+        if (candidate) ws.send(JSON.stringify({ type: 'ice', candidate }));
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
+          setStatus('waiting', 'Waiting for customer…');
+          overlay.classList.remove('hidden');
+          video.srcObject = null;
+        }
+      };
+    }
+
+    async function initiateCall() {
+      if (pc) { pc.close(); pc = null; }
+      buildPC();
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      ws.send(JSON.stringify({ type: 'offer', offer }));
+    }
+
+    // ── Signalling ────────────────────────────────────────────────────────────
+    const ws = new WebSocket(`wss://${location.host}`);
+
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'join', role: 'agent' }));
+
+    ws.onmessage = async ({ data }) => {
+      const msg = JSON.parse(data);
+
+      if (msg.type === 'peer-joined' && msg.role === 'customer') {
+        setStatus('waiting', 'Customer ready, connecting…');
+        await initiateCall();
+      }
+
+      if (msg.type === 'answer' && pc) {
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
+      }
+
+      if (msg.type === 'ice' && pc) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
+      }
+
+      if (msg.type === 'peer-left') {
+        setStatus('waiting', 'Waiting for customer…');
+        overlay.classList.remove('hidden');
+        video.srcObject = null;
+        pc?.close(); pc = null;
+      }
+    };
+
+    ws.onerror = () => setStatus('error', 'Connection error');
+    ws.onclose = () => setStatus('error', 'Disconnected — please refresh');
+  </script>
+</body>
+</html>
