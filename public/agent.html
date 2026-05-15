@@ -198,6 +198,13 @@
 
   <div id="hint">Pointer · Marker · Highlighter · Arrow · Clear · 📷</div>
 
+  <!-- Debug panel — remove once video issue is resolved -->
+  <div id="dbg" style="
+    position:absolute; bottom:60px; right:16px; z-index:50;
+    background:rgba(0,0,0,0.75); color:#0f0; font:11px/1.6 monospace;
+    padding:8px 12px; border-radius:8px; pointer-events:none;
+  "></div>
+
   <div id="waiting-overlay">
     <div class="spinner"></div>
     <h2>Waiting for customer</h2>
@@ -218,6 +225,20 @@
   const label   = document.getElementById('status-text');
   const overlay = document.getElementById('waiting-overlay');
   const flash   = document.getElementById('flash');
+  const dbg     = document.getElementById('dbg');
+
+  function log(msg) {
+    const lines = (dbg.textContent + '\n' + msg).trim().split('\n').slice(-8);
+    dbg.textContent = lines.join('\n');
+  }
+
+  function showVideo(srcObject) {
+    video.srcObject = srcObject;
+    video.play().catch(e => log('play() error: ' + e.message));
+    overlay.classList.add('hidden');
+    setStatus('connected', 'Customer connected');
+    log('video.srcObject set, play() called');
+  }
 
   // ── State ────────────────────────────────────────────────────────────────
   let pc = null, dataChannel = null;
@@ -483,22 +504,25 @@
     dataChannel.onclose = () => console.log('channel closed');
 
     pc.ontrack = ({ track, streams }) => {
-      // Some browsers fire ontrack with an empty streams array — fall back to raw track
-      video.srcObject = (streams && streams[0]) ? streams[0] : new MediaStream([track]);
-      overlay.classList.add('hidden');
-      setStatus('connected', 'Customer connected');
+      log(`ontrack: kind=${track.kind} state=${track.readyState} streams=${streams.length}`);
+      const src = (streams && streams[0]) ? streams[0] : new MediaStream([track]);
+      showVideo(src);
     };
 
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) ws.send(JSON.stringify({ type: 'ice', candidate }));
     };
 
+    pc.onicegatheringstate = () => log('ice gathering: ' + pc.iceGatheringState);
+    pc.oniceconnectionstatechange = () => log('ice: ' + pc.iceConnectionState);
+
     pc.onconnectionstatechange = () => {
+      log('connState: ' + pc.connectionState);
       if (pc.connectionState === 'connected') {
-        // Fallback: if ontrack didn't fire yet, pull from receiver directly
         if (!video.srcObject) {
           const receiver = pc.getReceivers().find(r => r.track?.kind === 'video');
-          if (receiver) video.srcObject = new MediaStream([receiver.track]);
+          log('fallback receiver: ' + (receiver ? receiver.track.readyState : 'none'));
+          if (receiver) showVideo(new MediaStream([receiver.track]));
         }
         overlay.classList.add('hidden');
         setStatus('connected', 'Customer connected');
@@ -514,8 +538,10 @@
   async function initiateCall() {
     if (pc) { pc.close(); pc = null; }
     buildPC();
+    log('creating offer…');
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
+    log('offer sent');
     ws.send(JSON.stringify({ type: 'offer', offer }));
   }
 
@@ -526,10 +552,13 @@
     const msg = JSON.parse(data);
     if (msg.type === 'peer-joined' && msg.role === 'customer') {
       setStatus('waiting', 'Customer ready, connecting…');
+      log('customer joined → initiating call');
       await initiateCall();
     }
-    if (msg.type === 'answer' && pc)
+    if (msg.type === 'answer' && pc) {
+      log('answer received → setRemoteDescription');
       await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
+    }
     if (msg.type === 'ice' && pc)
       try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
     if (msg.type === 'peer-left') {
