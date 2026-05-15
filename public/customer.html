@@ -8,266 +8,272 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #000; overflow: hidden; font-family: system-ui, sans-serif; }
 
-    #container {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-    }
+    #container { position: relative; width: 100vw; height: 100vh; }
 
     #local-video {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       object-fit: contain;
       background: #000;
-      /* Mirror for front cam, but we're using rear — no flip needed */
     }
 
-    #pointer-canvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
+    /* draw-canvas holds persistent drawings from agent */
+    /* pointer-canvas holds the animated pointer on top */
+    #draw-canvas, #pointer-canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
       pointer-events: none;
     }
+    #draw-canvas   { z-index: 1; }
+    #pointer-canvas { z-index: 2; }
 
     #status {
-      position: absolute;
-      top: 16px;
-      left: 50%;
+      position: absolute; top: 16px; left: 50%;
       transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.55);
-      color: #fff;
-      padding: 6px 18px;
-      border-radius: 20px;
-      font-size: 13px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      background: rgba(0,0,0,0.55); color: #fff;
+      padding: 6px 18px; border-radius: 20px; font-size: 13px;
+      display: flex; align-items: center; gap: 8px;
       backdrop-filter: blur(6px);
       white-space: nowrap;
     }
-
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #888;
-      flex-shrink: 0;
-    }
-    .dot.waiting  { background: #f59e0b; animation: blink 1.4s infinite; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #888; flex-shrink: 0; }
+    .dot.waiting   { background: #f59e0b; animation: blink 1.4s infinite; }
     .dot.connected { background: #22c55e; }
-    .dot.error    { background: #ef4444; }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.25; }
-    }
+    .dot.error     { background: #ef4444; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
 
     #hint {
-      position: absolute;
-      bottom: 28px;
-      left: 50%;
+      position: absolute; bottom: 28px; left: 50%;
       transform: translateX(-50%);
-      color: rgba(255, 255, 255, 0.4);
-      font-size: 12px;
-      text-align: center;
+      color: rgba(255,255,255,0.35); font-size: 12px;
       pointer-events: none;
     }
   </style>
 </head>
 <body>
-  <div id="container">
-    <video id="local-video" autoplay playsinline muted></video>
-    <canvas id="pointer-canvas"></canvas>
+<div id="container">
+  <video id="local-video" autoplay playsinline muted></video>
+  <canvas id="draw-canvas"></canvas>
+  <canvas id="pointer-canvas"></canvas>
 
-    <div id="status">
-      <div class="dot waiting" id="status-dot"></div>
-      <span id="status-text">Starting camera…</span>
-    </div>
-
-    <div id="hint">Point the camera at what you need help with</div>
+  <div id="status">
+    <div class="dot waiting" id="status-dot"></div>
+    <span id="status-text">Starting camera…</span>
   </div>
+  <div id="hint">Point camera at what you need help with</div>
+</div>
 
-  <script>
-    const video  = document.getElementById('local-video');
-    const canvas = document.getElementById('pointer-canvas');
-    const ctx    = canvas.getContext('2d');
-    const dot    = document.getElementById('status-dot');
-    const label  = document.getElementById('status-text');
+<script>
+  const video   = document.getElementById('local-video');
+  const drawCvs = document.getElementById('draw-canvas');
+  const ptrCvs  = document.getElementById('pointer-canvas');
+  const dctx    = drawCvs.getContext('2d');
+  const pctx    = ptrCvs.getContext('2d');
+  const dot     = document.getElementById('status-dot');
+  const label   = document.getElementById('status-text');
 
-    let pc      = null;
-    let pointer = null; // { x, y } normalised 0‑1
+  let pc      = null;
+  let pointer = null; // { x, y } normalised
 
-    // ── Canvas sizing ────────────────────────────────────────────────────────
-    function resize() {
-      canvas.width  = canvas.clientWidth;
-      canvas.height = canvas.clientHeight;
-    }
-    window.addEventListener('resize', resize);
-    resize();
+  // ── Canvas sizing ────────────────────────────────────────────────────────
+  function resize() {
+    [drawCvs, ptrCvs].forEach(c => { c.width = c.clientWidth; c.height = c.clientHeight; });
+  }
+  window.addEventListener('resize', resize);
+  resize();
 
-    // ── Status helper ────────────────────────────────────────────────────────
-    function setStatus(state, text) {
-      dot.className = 'dot ' + state;
-      label.textContent = text;
-    }
+  function setStatus(s, t) { dot.className = 'dot ' + s; label.textContent = t; }
 
-    // ── Video layout (object-fit: contain) ───────────────────────────────────
-    function videoBounds() {
-      const vw = video.videoWidth  || canvas.width;
-      const vh = video.videoHeight || canvas.height;
-      const ew = canvas.width, eh = canvas.height;
-      const vr = vw / vh, er = ew / eh;
-      let w, h, x, y;
-      if (vr > er) { w = ew; h = ew / vr; x = 0;           y = (eh - h) / 2; }
-      else         { h = eh; w = eh * vr;  y = 0;           x = (ew - w) / 2; }
-      return { x, y, w, h };
-    }
+  // ── Video layout ─────────────────────────────────────────────────────────
+  function videoBounds() {
+    const vw = video.videoWidth  || drawCvs.width;
+    const vh = video.videoHeight || drawCvs.height;
+    const ew = drawCvs.width, eh = drawCvs.height;
+    const vr = vw / vh, er = ew / eh;
+    let w, h, x, y;
+    if (vr > er) { w = ew; h = ew / vr; x = 0;          y = (eh - h) / 2; }
+    else         { h = eh; w = eh * vr;  y = 0;          x = (ew - w) / 2; }
+    return { x, y, w, h };
+  }
 
-    // ── AR pointer animation ─────────────────────────────────────────────────
-    (function drawLoop() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+  function fromNorm(nx, ny) {
+    const b = videoBounds();
+    return { x: b.x + nx * b.w, y: b.y + ny * b.h };
+  }
 
-      if (pointer) {
-        const b  = videoBounds();
-        const px = b.x + pointer.x * b.w;
-        const py = b.y + pointer.y * b.h;
-        const t  = Date.now() / 500;
-        const r  = 22 + Math.sin(t) * 6; // pulsing outer ring
+  // ── Drawing primitives ───────────────────────────────────────────────────
+  const BRUSH = {
+    marker:      { size: 4,  alpha: 1.0,  cap: 'round',  join: 'round'  },
+    highlighter: { size: 26, alpha: 0.38, cap: 'square', join: 'round'  },
+    arrow:       { size: 3,  alpha: 1.0                                  },
+  };
 
-        // Shadow glow
-        ctx.shadowColor = 'rgba(239,68,68,0.6)';
-        ctx.shadowBlur  = 12;
+  function renderLine(x1, y1, x2, y2, brush, color) {
+    const p1 = fromNorm(x1, y1), p2 = fromNorm(x2, y2);
+    const b  = BRUSH[brush] || BRUSH.marker;
+    dctx.save();
+    dctx.globalAlpha = b.alpha;
+    dctx.strokeStyle = color;
+    dctx.lineWidth   = b.size;
+    dctx.lineCap     = b.cap;
+    dctx.lineJoin    = b.join;
+    dctx.beginPath();
+    dctx.moveTo(p1.x, p1.y);
+    dctx.lineTo(p2.x, p2.y);
+    dctx.stroke();
+    dctx.restore();
+  }
 
-        // Outer pulsing ring
-        ctx.beginPath();
-        ctx.arc(px, py, r, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(239,68,68,0.45)';
-        ctx.lineWidth   = 2;
-        ctx.stroke();
+  function renderArrow(x1, y1, x2, y2, color) {
+    const s = fromNorm(x1, y1), e = fromNorm(x2, y2);
+    const len = Math.hypot(e.x-s.x, e.y-s.y);
+    if (len < 3) return;
+    const headLen = Math.min(28, len * 0.38);
+    const angle   = Math.atan2(e.y-s.y, e.x-s.x);
+    dctx.save();
+    dctx.strokeStyle = color;
+    dctx.fillStyle   = color;
+    dctx.lineWidth   = BRUSH.arrow.size;
+    dctx.lineCap     = 'round';
+    // shaft
+    dctx.beginPath();
+    dctx.moveTo(s.x, s.y);
+    dctx.lineTo(e.x - headLen * 0.65 * Math.cos(angle), e.y - headLen * 0.65 * Math.sin(angle));
+    dctx.stroke();
+    // head
+    dctx.beginPath();
+    dctx.moveTo(e.x, e.y);
+    dctx.lineTo(e.x - headLen * Math.cos(angle - Math.PI/7), e.y - headLen * Math.sin(angle - Math.PI/7));
+    dctx.lineTo(e.x - headLen * Math.cos(angle + Math.PI/7), e.y - headLen * Math.sin(angle + Math.PI/7));
+    dctx.closePath();
+    dctx.fill();
+    dctx.restore();
+  }
 
-        ctx.shadowBlur = 0;
+  // ── Pointer animation loop ────────────────────────────────────────────────
+  (function ptrLoop() {
+    pctx.clearRect(0, 0, ptrCvs.width, ptrCvs.height);
 
-        // Inner solid ring
-        ctx.beginPath();
-        ctx.arc(px, py, 10, 0, Math.PI * 2);
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth   = 2.5;
-        ctx.stroke();
+    if (pointer) {
+      const { x, y } = fromNorm(pointer.x, pointer.y);
+      const t = Date.now() / 500;
+      const r = 22 + Math.sin(t) * 6;
 
-        // Centre dot
-        ctx.beginPath();
-        ctx.arc(px, py, 3, 0, Math.PI * 2);
-        ctx.fillStyle = '#ef4444';
-        ctx.fill();
+      pctx.shadowColor = 'rgba(239,68,68,0.6)';
+      pctx.shadowBlur  = 14;
+      pctx.beginPath(); pctx.arc(x, y, r, 0, Math.PI*2);
+      pctx.strokeStyle = 'rgba(239,68,68,0.45)'; pctx.lineWidth = 2; pctx.stroke();
 
-        // Crosshair lines (gap around inner ring)
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth   = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(px - 22, py); ctx.lineTo(px - 12, py);
-        ctx.moveTo(px + 12, py); ctx.lineTo(px + 22, py);
-        ctx.moveTo(px, py - 22); ctx.lineTo(px, py - 12);
-        ctx.moveTo(px, py + 12); ctx.lineTo(px, py + 22);
-        ctx.stroke();
-      }
+      pctx.shadowBlur = 0;
+      pctx.beginPath(); pctx.arc(x, y, 10, 0, Math.PI*2);
+      pctx.strokeStyle = '#ef4444'; pctx.lineWidth = 2.5; pctx.stroke();
 
-      requestAnimationFrame(drawLoop);
-    })();
+      pctx.beginPath(); pctx.arc(x, y, 3, 0, Math.PI*2);
+      pctx.fillStyle = '#ef4444'; pctx.fill();
 
-    // ── Camera ───────────────────────────────────────────────────────────────
-    async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width:  { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      });
-      video.srcObject = stream;
-      return stream;
-    }
-
-    // ── WebRTC (answerer) ────────────────────────────────────────────────────
-    function buildPC(stream) {
-      pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-
-      // Send local camera to agent
-      stream.getTracks().forEach(t => pc.addTrack(t, stream));
-
-      pc.onicecandidate = ({ candidate }) => {
-        if (candidate) ws.send(JSON.stringify({ type: 'ice', candidate }));
-      };
-
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'connected') {
-          setStatus('connected', 'Agent connected');
-        } else if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
-          setStatus('waiting', 'Waiting for agent…');
-          pointer = null;
-        }
-      };
-
-      // Receive pointer coordinates from agent via data channel
-      pc.ondatachannel = ({ channel }) => {
-        channel.onmessage = ({ data }) => {
-          try {
-            const msg = JSON.parse(data);
-            if (msg.type === 'pointer')     pointer = { x: msg.x, y: msg.y };
-            if (msg.type === 'pointer-off') pointer = null;
-          } catch {}
-        };
-      };
-
-      return pc;
+      pctx.strokeStyle = '#ef4444'; pctx.lineWidth = 1.5;
+      pctx.beginPath();
+      pctx.moveTo(x-22,y); pctx.lineTo(x-12,y);
+      pctx.moveTo(x+12,y); pctx.lineTo(x+22,y);
+      pctx.moveTo(x,y-22); pctx.lineTo(x,y-12);
+      pctx.moveTo(x,y+12); pctx.lineTo(x,y+22);
+      pctx.stroke();
     }
 
-    // ── Signalling ───────────────────────────────────────────────────────────
-    const ws = new WebSocket(`wss://${location.host}`);
-    let stream;
+    requestAnimationFrame(ptrLoop);
+  })();
 
-    ws.onopen = async () => {
-      setStatus('waiting', 'Starting camera…');
-      try {
-        stream = await startCamera();
-        setStatus('waiting', 'Waiting for agent…');
-        ws.send(JSON.stringify({ type: 'join', role: 'customer' }));
-      } catch (e) {
-        setStatus('error', 'Camera error: ' + e.message);
-      }
+  // ── Data channel message handler ─────────────────────────────────────────
+  function handleMsg(msg) {
+    switch (msg.type) {
+      case 'pointer':     pointer = { x: msg.x, y: msg.y }; break;
+      case 'pointer-off': pointer = null; break;
+      case 'draw-line':   renderLine(msg.x1, msg.y1, msg.x2, msg.y2, msg.brush, msg.color); break;
+      case 'draw-arrow':  renderArrow(msg.x1, msg.y1, msg.x2, msg.y2, msg.color); break;
+      case 'draw-clear':  dctx.clearRect(0, 0, drawCvs.width, drawCvs.height); break;
+    }
+  }
+
+  // ── WebRTC (answerer) ─────────────────────────────────────────────────────
+  function buildPC(stream) {
+    pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    stream.getTracks().forEach(t => pc.addTrack(t, stream));
+
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate) ws.send(JSON.stringify({ type: 'ice', candidate }));
     };
 
-    ws.onmessage = async ({ data }) => {
-      const msg = JSON.parse(data);
-
-      if (msg.type === 'peer-joined' && msg.role === 'agent') {
-        setStatus('waiting', 'Agent ready, connecting…');
-        // Agent will send an offer; we'll set up the PC then
-      }
-
-      if (msg.type === 'offer') {
-        if (pc) { pc.close(); pc = null; }
-        buildPC(stream);
-        await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        ws.send(JSON.stringify({ type: 'answer', answer }));
-      }
-
-      if (msg.type === 'ice' && pc) {
-        try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
-      }
-
-      if (msg.type === 'peer-left') {
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') {
+        setStatus('connected', 'Agent connected');
+      } else if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
         setStatus('waiting', 'Waiting for agent…');
         pointer = null;
-        pc?.close(); pc = null;
+        dctx.clearRect(0, 0, drawCvs.width, drawCvs.height);
       }
     };
 
-    ws.onerror = () => setStatus('error', 'Connection error');
-    ws.onclose = () => setStatus('error', 'Disconnected — please refresh');
-  </script>
+    pc.ondatachannel = ({ channel }) => {
+      channel.onmessage = ({ data }) => {
+        try { handleMsg(JSON.parse(data)); } catch {}
+      };
+    };
+  }
+
+  // ── Camera ────────────────────────────────────────────────────────────────
+  async function startCamera() {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    video.srcObject = stream;
+    return stream;
+  }
+
+  // ── Signalling ────────────────────────────────────────────────────────────
+  const ws = new WebSocket(`wss://${location.host}`);
+  let stream;
+
+  ws.onopen = async () => {
+    setStatus('waiting', 'Starting camera…');
+    try {
+      stream = await startCamera();
+      setStatus('waiting', 'Waiting for agent…');
+      ws.send(JSON.stringify({ type: 'join', role: 'customer' }));
+    } catch (e) {
+      setStatus('error', 'Camera error: ' + e.message);
+    }
+  };
+
+  ws.onmessage = async ({ data }) => {
+    const msg = JSON.parse(data);
+
+    if (msg.type === 'peer-joined' && msg.role === 'agent') {
+      setStatus('waiting', 'Agent ready, connecting…');
+    }
+
+    if (msg.type === 'offer') {
+      if (pc) { pc.close(); pc = null; }
+      buildPC(stream);
+      await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      ws.send(JSON.stringify({ type: 'answer', answer }));
+    }
+
+    if (msg.type === 'ice' && pc) {
+      try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
+    }
+
+    if (msg.type === 'peer-left') {
+      setStatus('waiting', 'Waiting for agent…');
+      pointer = null;
+      dctx.clearRect(0, 0, drawCvs.width, drawCvs.height);
+      pc?.close(); pc = null;
+    }
+  };
+
+  ws.onerror = () => setStatus('error', 'Connection error');
+  ws.onclose = () => setStatus('error', 'Disconnected — please refresh');
+</script>
 </body>
 </html>
