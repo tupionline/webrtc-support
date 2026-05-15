@@ -110,7 +110,7 @@
       background: #0f0f0f; z-index: 20;
       gap: 14px; transition: opacity 0.3s;
     }
-    #waiting-overlay.hidden { opacity: 0; pointer-events: none; }
+    #waiting-overlay.hidden { display: none; }
     #waiting-overlay h2 { font-size: 18px; font-weight: 500; color: #e5e5e5; }
     #waiting-overlay p  { font-size: 13px; color: #666; }
     .spinner { width: 36px; height: 36px; border: 3px solid #2a2a2a; border-top-color: #3b82f6; border-radius: 50%; animation: spin .8s linear infinite; }
@@ -482,8 +482,9 @@
     dataChannel.onopen  = () => console.log('channel open');
     dataChannel.onclose = () => console.log('channel closed');
 
-    pc.ontrack = ({ streams }) => {
-      video.srcObject = streams[0];
+    pc.ontrack = ({ track, streams }) => {
+      // Some browsers fire ontrack with an empty streams array — fall back to raw track
+      video.srcObject = (streams && streams[0]) ? streams[0] : new MediaStream([track]);
       overlay.classList.add('hidden');
       setStatus('connected', 'Customer connected');
     };
@@ -493,7 +494,15 @@
     };
 
     pc.onconnectionstatechange = () => {
-      if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
+      if (pc.connectionState === 'connected') {
+        // Fallback: if ontrack didn't fire yet, pull from receiver directly
+        if (!video.srcObject) {
+          const receiver = pc.getReceivers().find(r => r.track?.kind === 'video');
+          if (receiver) video.srcObject = new MediaStream([receiver.track]);
+        }
+        overlay.classList.add('hidden');
+        setStatus('connected', 'Customer connected');
+      } else if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
         setStatus('waiting', 'Waiting for customer…');
         overlay.classList.remove('hidden');
         video.srcObject = null;
