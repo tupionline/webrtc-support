@@ -21,8 +21,8 @@
       position: absolute; inset: 0;
       width: 100%; height: 100%;
     }
-    #draw-canvas      { z-index: 2; pointer-events: none; }
-    #cursor-canvas    { z-index: 3; pointer-events: none; }
+    #draw-canvas       { z-index: 2; pointer-events: none; }
+    #cursor-canvas     { z-index: 3; pointer-events: none; }
     #interaction-layer { z-index: 4; }
 
     #interaction-layer.tool-pointer     { cursor: none; }
@@ -41,40 +41,25 @@
       border: 1px solid rgba(255,255,255,0.09);
       border-radius: 18px;
       padding: 12px 8px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 5px;
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
     }
-
-    .tb-sep {
-      width: 26px; height: 1px;
-      background: rgba(255,255,255,0.1);
-      margin: 5px 0;
-    }
+    .tb-sep { width: 26px; height: 1px; background: rgba(255,255,255,0.1); margin: 5px 0; }
 
     .tb-btn {
-      width: 42px; height: 42px;
-      border-radius: 11px;
-      border: none;
-      background: transparent;
-      color: rgba(255,255,255,0.45);
-      cursor: pointer;
+      width: 42px; height: 42px; border-radius: 11px; border: none;
+      background: transparent; color: rgba(255,255,255,0.45); cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.14s, color 0.14s;
     }
     .tb-btn:hover  { background: rgba(255,255,255,0.1);  color: #fff; }
     .tb-btn.active { background: rgba(255,255,255,0.16); color: #fff; }
     .tb-btn svg    { width: 19px; height: 19px; }
-
-    .tb-btn.danger:hover { background: rgba(239,68,68,0.18); color: #ef4444; }
-    .tb-btn.capture:hover { background: rgba(59,130,246,0.2); color: #60a5fa; }
+    .tb-btn.danger:hover  { background: rgba(239,68,68,0.18);  color: #ef4444; }
+    .tb-btn.capture:hover { background: rgba(59,130,246,0.2);  color: #60a5fa; }
 
     .color-swatch {
-      width: 24px; height: 24px;
-      border-radius: 50%;
-      border: 2.5px solid rgba(255,255,255,0.15);
-      cursor: pointer;
+      width: 24px; height: 24px; border-radius: 50%;
+      border: 2.5px solid rgba(255,255,255,0.15); cursor: pointer;
       transition: transform 0.13s, border-color 0.13s;
     }
     .color-swatch:hover  { transform: scale(1.18); }
@@ -82,8 +67,7 @@
 
     /* ── Status ── */
     #status {
-      position: absolute; top: 16px; left: 50%;
-      transform: translateX(-50%);
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
       background: rgba(0,0,0,0.55); color: #fff;
       padding: 6px 18px; border-radius: 20px; font-size: 13px;
       display: flex; align-items: center; gap: 8px;
@@ -96,19 +80,16 @@
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
 
     #hint {
-      position: absolute; bottom: 24px; left: 50%;
-      transform: translateX(-50%);
+      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
       color: rgba(255,255,255,0.3); font-size: 12px;
       z-index: 10; pointer-events: none; white-space: nowrap;
     }
 
     /* ── Waiting overlay ── */
     #waiting-overlay {
-      position: absolute; inset: 0;
-      display: flex; flex-direction: column;
+      position: absolute; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      background: #0f0f0f; z-index: 20;
-      gap: 14px; transition: opacity 0.3s;
+      background: #0f0f0f; z-index: 20; gap: 14px;
     }
     #waiting-overlay.hidden { display: none; }
     #waiting-overlay h2 { font-size: 18px; font-weight: 500; color: #e5e5e5; }
@@ -117,12 +98,7 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Camera flash ── */
-    #flash {
-      position: absolute; inset: 0;
-      background: #fff; opacity: 0;
-      z-index: 30; pointer-events: none;
-      transition: opacity 0.08s;
-    }
+    #flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 30; pointer-events: none; transition: opacity 0.08s; }
     #flash.pop { opacity: 0.75; }
   </style>
 </head>
@@ -133,39 +109,22 @@
   <canvas id="cursor-canvas"></canvas>
   <div id="interaction-layer" class="tool-pointer"></div>
 
-  <!-- ── Toolbar ── -->
   <div id="toolbar">
-
-    <!-- Tools -->
     <button class="tb-btn active" id="t-pointer" title="Pointer">
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M5.5 3.21V20.8l4.19-4.19 2.3 5.32 1.84-.8-2.3-5.32H17z"/>
-      </svg>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.5 3.21V20.8l4.19-4.19 2.3 5.32 1.84-.8-2.3-5.32H17z"/></svg>
     </button>
-
     <button class="tb-btn" id="t-marker" title="Marker">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-      </svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
     </button>
-
     <button class="tb-btn" id="t-highlighter" title="Highlighter">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M15.5 5 19 8.5l-9 9-5 1 1-5Z"/>
-        <line x1="2" y1="22" x2="22" y2="22" stroke-width="3"/>
-      </svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 5 19 8.5l-9 9-5 1 1-5Z"/><line x1="2" y1="22" x2="22" y2="22" stroke-width="3"/></svg>
     </button>
-
     <button class="tb-btn" id="t-arrow" title="Arrow (drag to draw)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="5" y1="12" x2="19" y2="12"/>
-        <polyline points="13 6 19 12 13 18"/>
-      </svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
     </button>
 
     <div class="tb-sep"></div>
 
-    <!-- Colors -->
     <div class="color-swatch active" data-color="#ef4444" style="background:#ef4444" title="Red"></div>
     <div class="color-swatch"        data-color="#3b82f6" style="background:#3b82f6" title="Blue"></div>
     <div class="color-swatch"        data-color="#fbbf24" style="background:#fbbf24" title="Yellow"></div>
@@ -173,44 +132,25 @@
 
     <div class="tb-sep"></div>
 
-    <!-- Actions -->
     <button class="tb-btn danger"  id="btn-clear"   title="Clear all drawings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="3 6 5 6 21 6"/>
-        <path d="M19 6l-1 14H6L5 6"/>
-        <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
-      </svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
     </button>
-
     <button class="tb-btn capture" id="btn-capture" title="Capture & download photo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-        <circle cx="12" cy="13" r="4"/>
-      </svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
     </button>
-
   </div>
 
   <div id="status">
     <div class="dot waiting" id="status-dot"></div>
     <span id="status-text">Waiting for customer…</span>
   </div>
-
-  <div id="hint">Pointer · Marker · Highlighter · Arrow · Clear · 📷</div>
-
-  <!-- Debug panel — remove once video issue is resolved -->
-  <div id="dbg" style="
-    position:absolute; bottom:60px; right:16px; z-index:50;
-    background:rgba(0,0,0,0.75); color:#0f0; font:11px/1.6 monospace;
-    padding:8px 12px; border-radius:8px; pointer-events:none;
-  "></div>
+  <div id="hint">Pointer · Marker · Highlighter · Arrow · Clear · 📷 · Drawings track camera movement</div>
 
   <div id="waiting-overlay">
     <div class="spinner"></div>
     <h2>Waiting for customer</h2>
     <p>The customer will connect shortly…</p>
   </div>
-
   <div id="flash"></div>
 </div>
 
@@ -225,30 +165,101 @@
   const label   = document.getElementById('status-text');
   const overlay = document.getElementById('waiting-overlay');
   const flash   = document.getElementById('flash');
-  const dbg     = document.getElementById('dbg');
 
-  function log(msg) {
-    const lines = (dbg.textContent + '\n' + msg).trim().split('\n').slice(-8);
-    dbg.textContent = lines.join('\n');
+  // ── Block-matching tracker ──────────────────────────────────────────────────
+  // Tracks a reference patch in the video frame to anchor drawings to scene content.
+  function createTracker(videoEl) {
+    const SCALE  = 6;  // downsample factor (1280→213, 720→120)
+    const PATCH  = 11; // half-patch in downsampled pixels (23×23 full patch)
+    const SEARCH = 15; // half-search radius
+
+    let active = false;
+    let anchor = null;   // { x, y } in downsampled pixels
+    let refGray = null;  // Uint8Array luminance of reference frame
+    let W = 0, H = 0;
+    const offset = { x: 0, y: 0 }; // accumulated offset in normalised video coords
+
+    const oc  = document.createElement('canvas');
+    const oct = oc.getContext('2d', { willReadFrequently: true });
+
+    function getGray() {
+      const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+      if (!vw || !vh) return null;
+      W = Math.ceil(vw / SCALE); H = Math.ceil(vh / SCALE);
+      oc.width = W; oc.height = H;
+      oct.drawImage(videoEl, 0, 0, W, H);
+      const d = oct.getImageData(0, 0, W, H).data;
+      const g = new Uint8Array(W * H);
+      for (let i = 0, j = 0; i < d.length; i += 4, j++)
+        g[j] = (d[i] * 77 + d[i+1] * 150 + d[i+2] * 29) >> 8; // fast luminance
+      return g;
+    }
+
+    return {
+      offset,
+      get active() { return active; },
+
+      // Call once when first drawing is made. normX/Y = video-normalised anchor point.
+      capture(normX, normY) {
+        const g = getGray();
+        if (!g) return;
+        anchor = { x: Math.round(normX * W), y: Math.round(normY * H) };
+        refGray = g;
+        offset.x = 0; offset.y = 0;
+        active = true;
+      },
+
+      // Call each frame (throttled externally). Finds where anchor moved and updates offset.
+      update() {
+        if (!active || !refGray || !anchor) return;
+        const curr = getGray();
+        if (!curr) return;
+
+        const ax = anchor.x, ay = anchor.y;
+        let bx = 0, by = 0, bSAD = Infinity;
+
+        for (let dy = -SEARCH; dy <= SEARCH; dy++) {
+          for (let dx = -SEARCH; dx <= SEARCH; dx++) {
+            let sad = 0;
+            for (let py = -PATCH; py <= PATCH; py += 2) {
+              for (let px = -PATCH; px <= PATCH; px += 2) {
+                const ry = ay + py, rx = ax + px;
+                const cy = ay + dy + py, cx = ax + dx + px;
+                if (ry < 0 || ry >= H || rx < 0 || rx >= W) { sad += 50; continue; }
+                if (cy < 0 || cy >= H || cx < 0 || cx >= W) { sad += 50; continue; }
+                sad += Math.abs(refGray[ry * W + rx] - curr[cy * W + cx]);
+              }
+            }
+            if (sad < bSAD) { bSAD = sad; bx = dx; by = dy; }
+          }
+        }
+
+        // Accept match only if confident (avg < 25 grey levels per sampled pixel)
+        const samples = ((PATCH + 1) * (PATCH + 1)); // approx subsampled count
+        if (bSAD < samples * 25) {
+          anchor.x = Math.max(PATCH, Math.min(W - PATCH - 1, anchor.x + bx));
+          anchor.y = Math.max(PATCH, Math.min(H - PATCH - 1, anchor.y + by));
+          offset.x += bx / W;
+          offset.y += by / H;
+          refGray = curr; // adaptive: update reference to current frame
+        }
+      },
+
+      reset() { active = false; anchor = null; refGray = null; offset.x = 0; offset.y = 0; }
+    };
   }
 
-  function showVideo(srcObject) {
-    video.srcObject = srcObject;
-    video.play().catch(e => log('play() error: ' + e.message));
-    overlay.classList.add('hidden');
-    setStatus('connected', 'Customer connected');
-    log('video.srcObject set, play() called');
-  }
+  const tracker = createTracker(video);
 
-  // ── State ────────────────────────────────────────────────────────────────
-  let pc = null, dataChannel = null;
+  // ── Tool / color state ────────────────────────────────────────────────────
   let tool       = 'pointer';
   let color      = '#ef4444';
   let cursorPos  = null;
   let isDrawing  = false;
-  let prevNorm   = null;   // { x, y } for freehand continuity
-  let arrowStart = null;   // { x, y } normalised
+  let prevNorm   = null;  // content-coord prev point for freehand
+  let arrowStart = null;  // content-coord arrow start
   let lastPtrSend = 0;
+  let lastTrackT  = 0;
 
   const BRUSH = {
     marker:      { size: 4,  alpha: 1.0,  cap: 'round',  join: 'round'  },
@@ -256,7 +267,10 @@
     arrow:       { size: 3,  alpha: 1.0                                  },
   };
 
-  // ── Canvas resize ────────────────────────────────────────────────────────
+  // All drawing commands, stored in content-space (normalised, offset-free)
+  const drawCommands = [];
+
+  // ── Canvas resize ─────────────────────────────────────────────────────────
   function resize() {
     [drawCvs, cursCvs].forEach(c => { c.width = c.clientWidth; c.height = c.clientHeight; });
   }
@@ -265,7 +279,7 @@
 
   function setStatus(s, t) { dot.className = 'dot ' + s; label.textContent = t; }
 
-  // ── Video layout ─────────────────────────────────────────────────────────
+  // ── Video layout (object-fit: contain) ───────────────────────────────────
   function videoBounds() {
     const vw = video.videoWidth  || drawCvs.width;
     const vh = video.videoHeight || drawCvs.height;
@@ -277,23 +291,32 @@
     return { x, y, w, h };
   }
 
-  function toNorm(px, py)   { const b = videoBounds(); return { x: (px-b.x)/b.w, y: (py-b.y)/b.h }; }
-  function fromNorm(nx, ny) { const b = videoBounds(); return { x: b.x + nx*b.w, y: b.y + ny*b.h }; }
-  function inVideo(px, py)  { const b = videoBounds(); return px>=b.x && px<=b.x+b.w && py>=b.y && py<=b.y+b.h; }
+  // Screen pixel → content-space (subtract current tracking offset)
+  function toContent(px, py) {
+    const b = videoBounds();
+    return {
+      x: (px - b.x) / b.w - tracker.offset.x,
+      y: (py - b.y) / b.h - tracker.offset.y
+    };
+  }
 
-  // ── Drawing primitives ───────────────────────────────────────────────────
+  // Content-space → screen pixel (add current tracking offset)
+  function fromNormT(nx, ny) {
+    const b = videoBounds();
+    return { x: b.x + (nx + tracker.offset.x) * b.w, y: b.y + (ny + tracker.offset.y) * b.h };
+  }
+
+  // Screen pixel → normalised (no offset, for pointer only)
+  function toNorm(px, py)  { const b = videoBounds(); return { x: (px-b.x)/b.w, y: (py-b.y)/b.h }; }
+  function inVideo(px, py) { const b = videoBounds(); return px>=b.x && px<=b.x+b.w && py>=b.y && py<=b.y+b.h; }
+
+  // ── Drawing primitives (pixel coords) ────────────────────────────────────
   function renderLine(ctx, x1, y1, x2, y2, brush, clr) {
     const b = BRUSH[brush];
     ctx.save();
-    ctx.globalAlpha     = b.alpha;
-    ctx.strokeStyle     = clr;
-    ctx.lineWidth       = b.size;
-    ctx.lineCap         = b.cap;
-    ctx.lineJoin        = b.join;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
+    ctx.globalAlpha = b.alpha; ctx.strokeStyle = clr;
+    ctx.lineWidth = b.size; ctx.lineCap = b.cap; ctx.lineJoin = b.join;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     ctx.restore();
   }
 
@@ -303,60 +326,85 @@
     const headLen = Math.min(28, len * 0.38);
     const angle   = Math.atan2(y2-y1, x2-x1);
     ctx.save();
-    ctx.globalAlpha = alpha ?? 1;
-    ctx.strokeStyle = clr;
-    ctx.fillStyle   = clr;
-    ctx.lineWidth   = BRUSH.arrow.size;
-    ctx.lineCap     = 'round';
-    // shaft
+    ctx.globalAlpha = alpha ?? 1; ctx.strokeStyle = clr; ctx.fillStyle = clr;
+    ctx.lineWidth = BRUSH.arrow.size; ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2 - headLen * 0.65 * Math.cos(angle), y2 - headLen * 0.65 * Math.sin(angle));
     ctx.stroke();
-    // head
     ctx.beginPath();
     ctx.moveTo(x2, y2);
     ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI/7), y2 - headLen * Math.sin(angle - Math.PI/7));
     ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI/7), y2 - headLen * Math.sin(angle + Math.PI/7));
-    ctx.closePath();
-    ctx.fill();
+    ctx.closePath(); ctx.fill();
     ctx.restore();
   }
 
-  // ── Cursor / arrow-preview animation loop ────────────────────────────────
-  (function cursorLoop() {
+  // Render a single stored command using current tracking offset
+  function renderCmd(ctx, cmd) {
+    if (cmd.type === 'draw-line') {
+      const p1 = fromNormT(cmd.x1, cmd.y1), p2 = fromNormT(cmd.x2, cmd.y2);
+      renderLine(ctx, p1.x, p1.y, p2.x, p2.y, cmd.brush, cmd.color);
+    } else if (cmd.type === 'draw-arrow') {
+      const s = fromNormT(cmd.x1, cmd.y1), e = fromNormT(cmd.x2, cmd.y2);
+      renderArrow(ctx, s.x, s.y, e.x, e.y, cmd.color, 1);
+    }
+  }
+
+  // Centroid of all commands in current video-normalised coords (content + offset)
+  function commandsCentroid() {
+    let sx = 0, sy = 0, n = 0;
+    for (const cmd of drawCommands) {
+      sx += cmd.x1 + tracker.offset.x; sy += cmd.y1 + tracker.offset.y; n++;
+      sx += cmd.x2 + tracker.offset.x; sy += cmd.y2 + tracker.offset.y; n++;
+    }
+    return n > 0 ? { x: sx / n, y: sy / n } : { x: 0.5, y: 0.5 };
+  }
+
+  // ── Unified animation loop ────────────────────────────────────────────────
+  (function animLoop() {
+    const now = Date.now();
+
+    // Throttle tracker to ~12 fps
+    if (tracker.active && now - lastTrackT > 80) {
+      tracker.update();
+      lastTrackT = now;
+    }
+
+    // Redraw all drawing commands with current tracked offset
+    dctx.clearRect(0, 0, drawCvs.width, drawCvs.height);
+    for (const cmd of drawCommands) renderCmd(dctx, cmd);
+
+    // Cursor canvas: pointer + arrow preview
     cctx.clearRect(0, 0, cursCvs.width, cursCvs.height);
 
     if (tool === 'pointer' && cursorPos && inVideo(cursorPos.x, cursorPos.y)) {
       const { x, y } = cursorPos;
-      cctx.shadowColor = 'rgba(239,68,68,0.55)';
-      cctx.shadowBlur  = 12;
+      cctx.shadowColor = 'rgba(239,68,68,0.55)'; cctx.shadowBlur = 12;
       cctx.beginPath(); cctx.arc(x, y, 18, 0, Math.PI*2);
       cctx.strokeStyle = 'rgba(239,68,68,0.4)'; cctx.lineWidth = 1.5; cctx.stroke();
-      cctx.shadowBlur  = 0;
+      cctx.shadowBlur = 0;
       cctx.beginPath(); cctx.arc(x, y, 8, 0, Math.PI*2);
       cctx.strokeStyle = '#ef4444'; cctx.lineWidth = 2; cctx.stroke();
       cctx.beginPath(); cctx.arc(x, y, 2.5, 0, Math.PI*2);
       cctx.fillStyle = '#ef4444'; cctx.fill();
       cctx.strokeStyle = '#ef4444'; cctx.lineWidth = 1.5;
       cctx.beginPath();
-      cctx.moveTo(x-22,y); cctx.lineTo(x-10,y);
-      cctx.moveTo(x+10,y); cctx.lineTo(x+22,y);
-      cctx.moveTo(x,y-22); cctx.lineTo(x,y-10);
-      cctx.moveTo(x,y+10); cctx.lineTo(x,y+22);
+      cctx.moveTo(x-22,y); cctx.lineTo(x-10,y); cctx.moveTo(x+10,y); cctx.lineTo(x+22,y);
+      cctx.moveTo(x,y-22); cctx.lineTo(x,y-10); cctx.moveTo(x,y+10); cctx.lineTo(x,y+22);
       cctx.stroke();
     }
 
-    // Arrow drag preview
     if (tool === 'arrow' && arrowStart && cursorPos) {
-      const s = fromNorm(arrowStart.x, arrowStart.y);
+      const s = fromNormT(arrowStart.x, arrowStart.y);
       renderArrow(cctx, s.x, s.y, cursorPos.x, cursorPos.y, color, 0.55);
     }
 
-    requestAnimationFrame(cursorLoop);
+    requestAnimationFrame(animLoop);
   })();
 
   // ── Data channel helper ──────────────────────────────────────────────────
+  let pc = null, dataChannel = null;
   function send(msg) {
     if (dataChannel?.readyState === 'open') dataChannel.send(JSON.stringify(msg));
   }
@@ -367,29 +415,27 @@
     const now = Date.now();
     if (now - lastPtrSend < 33) return;
     lastPtrSend = now;
-    const n = toNorm(px, py);
+    const n = toNorm(px, py); // pointer uses screen coords, no tracking offset
     send({ type: 'pointer', x: n.x, y: n.y });
   }
 
-  // ── Drawing events ───────────────────────────────────────────────────────
+  // ── Drawing tools ─────────────────────────────────────────────────────────
   function onStart(px, py) {
     if (!inVideo(px, py)) return;
     isDrawing = true;
-    const n = toNorm(px, py);
-    if (tool === 'arrow') { arrowStart = n; }
-    else                  { prevNorm   = n; }
+    const n = toContent(px, py);
+    if (tool === 'arrow') arrowStart = n;
+    else prevNorm = n;
   }
 
   function onMove(px, py) {
-    if (!isDrawing) return;
+    if (!isDrawing || !inVideo(px, py)) return;
+    const n = toContent(px, py);
     if (tool === 'marker' || tool === 'highlighter') {
-      if (!inVideo(px, py)) return;
-      const n = toNorm(px, py);
       if (!prevNorm) { prevNorm = n; return; }
-      const p = fromNorm(prevNorm.x, prevNorm.y);
-      const c = fromNorm(n.x, n.y);
-      renderLine(dctx, p.x, p.y, c.x, c.y, tool, color);
-      send({ type: 'draw-line', x1: prevNorm.x, y1: prevNorm.y, x2: n.x, y2: n.y, brush: tool, color });
+      const cmd = { type: 'draw-line', x1: prevNorm.x, y1: prevNorm.y, x2: n.x, y2: n.y, brush: tool, color };
+      drawCommands.push(cmd);
+      send(cmd);
       prevNorm = n;
     }
   }
@@ -397,57 +443,42 @@
   function onEnd(px, py) {
     if (!isDrawing) return;
     isDrawing = false;
+    const needsAnchor = !tracker.active;
+
     if (tool === 'arrow' && arrowStart) {
-      const n = inVideo(px, py) ? toNorm(px, py) : arrowStart;
-      const s = fromNorm(arrowStart.x, arrowStart.y);
-      const e = fromNorm(n.x, n.y);
-      renderArrow(dctx, s.x, s.y, e.x, e.y, color);
-      send({ type: 'draw-arrow', x1: arrowStart.x, y1: arrowStart.y, x2: n.x, y2: n.y, color });
+      const n = inVideo(px, py) ? toContent(px, py) : arrowStart;
+      const cmd = { type: 'draw-arrow', x1: arrowStart.x, y1: arrowStart.y, x2: n.x, y2: n.y, color };
+      drawCommands.push(cmd);
+      send(cmd);
       arrowStart = null;
     }
     prevNorm = null;
+
+    // Anchor tracker on the first stroke of a fresh canvas
+    if (needsAnchor && drawCommands.length > 0) {
+      const c = commandsCentroid();
+      tracker.capture(c.x, c.y);
+      send({ type: 'track-anchor', x: c.x, y: c.y });
+    }
   }
 
-  // ── Interaction layer events ─────────────────────────────────────────────
+  // ── Interaction events ───────────────────────────────────────────────────
   function epos(e) {
-    const r   = cursCvs.getBoundingClientRect();
-    const src = e.touches ? e.touches[0] : e;
-    return { x: src.clientX - r.left, y: src.clientY - r.top };
+    const r = cursCvs.getBoundingClientRect();
+    const s = e.touches ? e.touches[0] : e;
+    return { x: s.clientX - r.left, y: s.clientY - r.top };
   }
 
-  layer.addEventListener('mousedown', e => {
-    const p = epos(e); cursorPos = p;
-    if (tool !== 'pointer') onStart(p.x, p.y);
-  });
-  layer.addEventListener('mousemove', e => {
-    const p = epos(e); cursorPos = p;
-    if (tool === 'pointer') sendPointer(p.x, p.y);
-    else onMove(p.x, p.y);
-  });
-  layer.addEventListener('mouseup',   e => { const p = epos(e); onEnd(p.x, p.y); });
-  layer.addEventListener('mouseleave', () => {
-    cursorPos = null;
-    send({ type: 'pointer-off' });
-    if (isDrawing) onEnd(-1, -1);
-  });
+  layer.addEventListener('mousedown',  e => { const p = epos(e); cursorPos = p; if (tool !== 'pointer') onStart(p.x, p.y); });
+  layer.addEventListener('mousemove',  e => { const p = epos(e); cursorPos = p; tool === 'pointer' ? sendPointer(p.x, p.y) : onMove(p.x, p.y); });
+  layer.addEventListener('mouseup',    e => { onEnd(epos(e).x, epos(e).y); });
+  layer.addEventListener('mouseleave', () => { cursorPos = null; send({ type: 'pointer-off' }); if (isDrawing) onEnd(-1, -1); });
 
-  layer.addEventListener('touchstart', e => {
-    e.preventDefault(); const p = epos(e); cursorPos = p;
-    if (tool !== 'pointer') onStart(p.x, p.y);
-  }, { passive: false });
-  layer.addEventListener('touchmove', e => {
-    e.preventDefault(); const p = epos(e); cursorPos = p;
-    if (tool === 'pointer') sendPointer(p.x, p.y);
-    else onMove(p.x, p.y);
-  }, { passive: false });
-  layer.addEventListener('touchend', () => {
-    const p = cursorPos || { x: -1, y: -1 };
-    cursorPos = null;
-    onEnd(p.x, p.y);
-    send({ type: 'pointer-off' });
-  });
+  layer.addEventListener('touchstart', e => { e.preventDefault(); const p = epos(e); cursorPos = p; if (tool !== 'pointer') onStart(p.x, p.y); }, { passive: false });
+  layer.addEventListener('touchmove',  e => { e.preventDefault(); const p = epos(e); cursorPos = p; tool === 'pointer' ? sendPointer(p.x, p.y) : onMove(p.x, p.y); }, { passive: false });
+  layer.addEventListener('touchend',   () => { const p = cursorPos || {x:-1,y:-1}; cursorPos = null; onEnd(p.x, p.y); send({ type: 'pointer-off' }); });
 
-  // ── Toolbar ──────────────────────────────────────────────────────────────
+  // ── Toolbar ───────────────────────────────────────────────────────────────
   document.querySelectorAll('[id^="t-"]').forEach(btn => {
     btn.addEventListener('click', () => {
       tool = btn.id.replace('t-', '');
@@ -468,67 +499,56 @@
   });
 
   document.getElementById('btn-clear').addEventListener('click', () => {
-    dctx.clearRect(0, 0, drawCvs.width, drawCvs.height);
+    drawCommands.length = 0;
+    tracker.reset();
     send({ type: 'draw-clear' });
   });
 
   document.getElementById('btn-capture').addEventListener('click', () => {
-    // Flash
     flash.classList.add('pop');
     setTimeout(() => flash.classList.remove('pop'), 220);
-
-    // Composite video frame + drawings
     const cap = document.createElement('canvas');
-    cap.width  = drawCvs.width;
-    cap.height = drawCvs.height;
+    cap.width = drawCvs.width; cap.height = drawCvs.height;
     const cx = cap.getContext('2d');
-    cx.fillStyle = '#000';
-    cx.fillRect(0, 0, cap.width, cap.height);
+    cx.fillStyle = '#000'; cx.fillRect(0, 0, cap.width, cap.height);
     const b = videoBounds();
     cx.drawImage(video, b.x, b.y, b.w, b.h);
     cx.drawImage(drawCvs, 0, 0);
-
     const link = document.createElement('a');
     link.download = `support-${Date.now()}.png`;
-    link.href     = cap.toDataURL('image/png');
+    link.href = cap.toDataURL('image/png');
     link.click();
   });
 
-  // ── WebRTC ───────────────────────────────────────────────────────────────
+  // ── WebRTC ────────────────────────────────────────────────────────────────
+  function showVideo(src) {
+    video.srcObject = src;
+    video.play().catch(() => {});
+    overlay.classList.add('hidden');
+    setStatus('connected', 'Customer connected');
+  }
+
   function buildPC() {
     pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
     pc.addTransceiver('video', { direction: 'recvonly' });
 
     dataChannel = pc.createDataChannel('control', { ordered: true });
-    dataChannel.onopen  = () => log('data channel open');
-    dataChannel.onclose = () => log('data channel closed');
-    dataChannel.onmessage = ({ data }) => {
-      try {
-        const m = JSON.parse(data);
-        if (m.type === '_dbg') log(m.msg);
-      } catch {}
-    };
+    dataChannel.onopen  = () => {};
+    dataChannel.onclose = () => {};
 
     pc.ontrack = ({ track, streams }) => {
-      log(`ontrack: kind=${track.kind} state=${track.readyState} streams=${streams.length}`);
-      const src = (streams && streams[0]) ? streams[0] : new MediaStream([track]);
-      showVideo(src);
+      showVideo((streams && streams[0]) ? streams[0] : new MediaStream([track]));
     };
 
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) ws.send(JSON.stringify({ type: 'ice', candidate }));
     };
 
-    pc.onicegatheringstate = () => log('ice gathering: ' + pc.iceGatheringState);
-    pc.oniceconnectionstatechange = () => log('ice: ' + pc.iceConnectionState);
-
     pc.onconnectionstatechange = () => {
-      log('connState: ' + pc.connectionState);
       if (pc.connectionState === 'connected') {
         if (!video.srcObject) {
-          const receiver = pc.getReceivers().find(r => r.track?.kind === 'video');
-          log('fallback receiver: ' + (receiver ? receiver.track.readyState : 'none'));
-          if (receiver) showVideo(new MediaStream([receiver.track]));
+          const r = pc.getReceivers().find(r => r.track?.kind === 'video');
+          if (r) showVideo(new MediaStream([r.track]));
         }
         overlay.classList.add('hidden');
         setStatus('connected', 'Customer connected');
@@ -536,7 +556,8 @@
         setStatus('waiting', 'Waiting for customer…');
         overlay.classList.remove('hidden');
         video.srcObject = null;
-        dctx.clearRect(0, 0, drawCvs.width, drawCvs.height);
+        drawCommands.length = 0;
+        tracker.reset();
       }
     };
   }
@@ -544,11 +565,8 @@
   async function initiateCall() {
     if (pc) { pc.close(); pc = null; }
     buildPC();
-    log('creating offer…');
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    const hasVideo = offer.sdp.includes('m=video');
-    log('offer sdp has video: ' + hasVideo);
     ws.send(JSON.stringify({ type: 'offer', offer }));
   }
 
@@ -559,24 +577,18 @@
     const msg = JSON.parse(data);
     if (msg.type === 'peer-joined' && msg.role === 'customer') {
       setStatus('waiting', 'Customer ready, connecting…');
-      log('customer joined → initiating call');
       await initiateCall();
     }
-    if (msg.type === 'answer' && pc) {
-      const hasVideo = msg.answer.sdp.includes('m=video');
-      const dir = msg.answer.sdp.match(/a=(sendonly|recvonly|sendrecv|inactive)/)?.[1] ?? '?';
-      log(`answer: video=${hasVideo} dir=${dir}`);
+    if (msg.type === 'answer' && pc)
       await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
-      const receivers = pc.getReceivers();
-      log(`receivers after answer: ${receivers.map(r=>r.track.kind+'/'+r.track.readyState).join(', ') || 'none'}`);
-    }
     if (msg.type === 'ice' && pc)
       try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
     if (msg.type === 'peer-left') {
       setStatus('waiting', 'Waiting for customer…');
       overlay.classList.remove('hidden');
       video.srcObject = null;
-      dctx.clearRect(0, 0, drawCvs.width, drawCvs.height);
+      drawCommands.length = 0;
+      tracker.reset();
       pc?.close(); pc = null;
     }
   };
