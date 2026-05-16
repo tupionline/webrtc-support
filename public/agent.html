@@ -23,6 +23,7 @@
       position: absolute; inset: 0;
       width: 100%; height: 100%;
     }
+    #freeze-canvas     { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; display: none; background: #000; }
     #draw-canvas       { z-index: 2; pointer-events: none; }
     #cursor-canvas     { z-index: 3; pointer-events: none; }
     #interaction-layer { z-index: 4; }
@@ -58,7 +59,20 @@
     .tb-btn svg    { width: 19px; height: 19px; }
     .tb-btn.danger:hover  { background: rgba(239,68,68,0.18);  color: #ef4444; }
     .tb-btn.capture:hover { background: rgba(59,130,246,0.2);  color: #60a5fa; }
-    .tb-btn.muted { background: rgba(239,68,68,0.18); color: #ef4444; }
+    .tb-btn.muted   { background: rgba(239,68,68,0.18); color: #ef4444; }
+    .tb-btn.freeze:hover  { background: rgba(139,92,246,0.2);  color: #a78bfa; }
+    .tb-btn.freeze.active { background: rgba(139,92,246,0.22); color: #a78bfa; }
+
+    #frozen-badge {
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+      background: rgba(139,92,246,0.18); color: #a78bfa;
+      border: 1px solid rgba(139,92,246,0.35);
+      padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      letter-spacing: 0.06em; display: flex; align-items: center; gap: 7px;
+      backdrop-filter: blur(6px); z-index: 11; pointer-events: none;
+    }
+    #frozen-badge.hidden { display: none; }
+    #frozen-badge .fpulse { width: 7px; height: 7px; border-radius: 50%; background: #a78bfa; animation: blink 1.4s infinite; }
 
     .color-swatch {
       width: 24px; height: 24px; border-radius: 50%;
@@ -127,6 +141,7 @@
 <body>
 <div id="container">
   <video id="remote-video" autoplay playsinline></video>
+  <canvas id="freeze-canvas"></canvas>
   <canvas id="draw-canvas"></canvas>
   <canvas id="cursor-canvas"></canvas>
   <div id="interaction-layer" class="tool-pointer"></div>
@@ -165,6 +180,10 @@
 
     <div class="tb-sep"></div>
 
+    <button class="tb-btn freeze" id="btn-freeze" title="Freeze frame">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+    </button>
+
     <button class="tb-btn danger"  id="btn-clear"   title="Clear all drawings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
     </button>
@@ -173,6 +192,7 @@
     </button>
   </div>
 
+  <div id="frozen-badge" class="hidden"><div class="fpulse"></div>FROZEN</div>
   <div id="status">
     <div class="dot waiting" id="status-dot"></div>
     <span id="status-text">Waiting for customer…</span>
@@ -196,11 +216,14 @@
 </div>
 
 <script>
-  const video   = document.getElementById('remote-video');
-  const drawCvs = document.getElementById('draw-canvas');
-  const cursCvs = document.getElementById('cursor-canvas');
-  const dctx    = drawCvs.getContext('2d');
-  const cctx    = cursCvs.getContext('2d');
+  const video    = document.getElementById('remote-video');
+  const freezeCvs = document.getElementById('freeze-canvas');
+  const fctx     = freezeCvs.getContext('2d');
+  const drawCvs  = document.getElementById('draw-canvas');
+  const cursCvs  = document.getElementById('cursor-canvas');
+  const dctx     = drawCvs.getContext('2d');
+  const cctx     = cursCvs.getContext('2d');
+  let frozen = false;
   const layer   = document.getElementById('interaction-layer');
   const dot     = document.getElementById('status-dot');
   const label   = document.getElementById('status-text');
@@ -313,7 +336,8 @@
 
   // ── Canvas resize ─────────────────────────────────────────────────────────
   function resize() {
-    [drawCvs, cursCvs].forEach(c => { c.width = c.clientWidth; c.height = c.clientHeight; });
+    [freezeCvs, drawCvs, cursCvs].forEach(c => { c.width = c.clientWidth; c.height = c.clientHeight; });
+    if (frozen) captureFreeze(); // re-snap if window resized while frozen
   }
   window.addEventListener('resize', resize);
   resize();
@@ -406,8 +430,8 @@
   (function animLoop() {
     const now = Date.now();
 
-    // Throttle tracker to ~12 fps
-    if (tracker.active && now - lastTrackT > 80) {
+    // Throttle tracker to ~12 fps (skip when frozen — frame is static)
+    if (!frozen && tracker.active && now - lastTrackT > 80) {
       tracker.update();
       lastTrackT = now;
     }
@@ -464,6 +488,15 @@
       leafletMarker.setLatLng([lat, lng]);
       leafletMap.panTo([lat, lng]);
     }
+  }
+
+  function unfreeze() {
+    if (!frozen) return;
+    frozen = false;
+    freezeCvs.style.display = 'none';
+    document.getElementById('btn-freeze').classList.remove('active');
+    document.getElementById('btn-freeze').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+    document.getElementById('frozen-badge').classList.add('hidden');
   }
 
   function resetMap() {
@@ -569,6 +602,34 @@
     send({ type: 'draw-clear' });
   });
 
+  function captureFreeze() {
+    const b = videoBounds();
+    fctx.fillStyle = '#000';
+    fctx.fillRect(0, 0, freezeCvs.width, freezeCvs.height);
+    fctx.drawImage(video, b.x, b.y, b.w, b.h);
+  }
+
+  document.getElementById('btn-freeze').addEventListener('click', () => {
+    if (!video.srcObject) return; // nothing to freeze
+    frozen = !frozen;
+    const btn = document.getElementById('btn-freeze');
+    const badge = document.getElementById('frozen-badge');
+    if (frozen) {
+      captureFreeze();
+      freezeCvs.style.display = 'block';
+      tracker.reset(); // static frame — no tracking needed
+      btn.classList.add('active');
+      badge.classList.remove('hidden');
+      // swap button icon to "play" so it's clear clicking again resumes
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>';
+    } else {
+      freezeCvs.style.display = 'none';
+      btn.classList.remove('active');
+      badge.classList.add('hidden');
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+    }
+  });
+
   document.getElementById('btn-mic').addEventListener('click', () => {
     agentMicMuted = !agentMicMuted;
     if (micStream) micStream.getAudioTracks().forEach(t => { t.enabled = !agentMicMuted; });
@@ -656,6 +717,7 @@
         video.srcObject = null;
         drawCommands.length = 0;
         tracker.reset();
+        unfreeze();
         resetMap();
       }
     };
@@ -690,6 +752,7 @@
       video.srcObject = null;
       drawCommands.length = 0;
       tracker.reset();
+      unfreeze();
       resetMap();
       pc?.close(); pc = null;
     }
