@@ -196,7 +196,9 @@
   // ── WebRTC (answerer) ─────────────────────────────────────────────────────
   function buildPC(stream) {
     pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    stream.getTracks().forEach(t => pc.addTrack(t, stream));
+
+    const tracks = stream.getTracks();
+    tracks.forEach(t => pc.addTrack(t, stream));
 
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) ws.send(JSON.stringify({ type: 'ice', candidate }));
@@ -213,6 +215,11 @@
     };
 
     pc.ondatachannel = ({ channel }) => {
+      channel.onopen = () => {
+        // Send track info to agent so it appears in the debug panel
+        const info = tracks.map(t => `${t.kind}/${t.readyState}`).join(', ');
+        channel.send(JSON.stringify({ type: '_dbg', msg: `customer tracks: ${info || 'NONE'}` }));
+      };
       channel.onmessage = ({ data }) => {
         try { handleMsg(JSON.parse(data)); } catch {}
       };

@@ -500,8 +500,14 @@
     pc.addTransceiver('video', { direction: 'recvonly' });
 
     dataChannel = pc.createDataChannel('control', { ordered: true });
-    dataChannel.onopen  = () => console.log('channel open');
-    dataChannel.onclose = () => console.log('channel closed');
+    dataChannel.onopen  = () => log('data channel open');
+    dataChannel.onclose = () => log('data channel closed');
+    dataChannel.onmessage = ({ data }) => {
+      try {
+        const m = JSON.parse(data);
+        if (m.type === '_dbg') log(m.msg);
+      } catch {}
+    };
 
     pc.ontrack = ({ track, streams }) => {
       log(`ontrack: kind=${track.kind} state=${track.readyState} streams=${streams.length}`);
@@ -541,7 +547,8 @@
     log('creating offer…');
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    log('offer sent');
+    const hasVideo = offer.sdp.includes('m=video');
+    log('offer sdp has video: ' + hasVideo);
     ws.send(JSON.stringify({ type: 'offer', offer }));
   }
 
@@ -556,8 +563,12 @@
       await initiateCall();
     }
     if (msg.type === 'answer' && pc) {
-      log('answer received → setRemoteDescription');
+      const hasVideo = msg.answer.sdp.includes('m=video');
+      const dir = msg.answer.sdp.match(/a=(sendonly|recvonly|sendrecv|inactive)/)?.[1] ?? '?';
+      log(`answer: video=${hasVideo} dir=${dir}`);
       await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
+      const receivers = pc.getReceivers();
+      log(`receivers after answer: ${receivers.map(r=>r.track.kind+'/'+r.track.readyState).join(', ') || 'none'}`);
     }
     if (msg.type === 'ice' && pc)
       try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
