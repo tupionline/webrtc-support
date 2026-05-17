@@ -1,5 +1,14 @@
-// Load .env in local development (not present on Railway — vars set via dashboard)
-try { require('fs').readFileSync('.env', 'utf8').split('\n').forEach(l => { const [k,v] = l.split('='); if (k && v) process.env[k.trim()] = v.trim(); }); } catch {}
+// Load .env in local development — split only on FIRST = so base64 values with = work
+try {
+  require('fs').readFileSync('.env', 'utf8').split('\n').forEach(l => {
+    const i = l.indexOf('=');
+    if (i > 0) {
+      const k = l.slice(0, i).trim();
+      const v = l.slice(i + 1).trim();
+      if (k && v && !k.startsWith('#')) process.env[k] = v;
+    }
+  });
+} catch {}
 
 const express = require('express');
 const Anthropic = require('@anthropic-ai/sdk');

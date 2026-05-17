@@ -42,6 +42,58 @@
       color: rgba(255,255,255,0.35); font-size: 12px; pointer-events: none;
     }
 
+    #btn-ai-customer {
+      position: absolute; bottom: 20px; left: 20px; z-index: 10;
+      width: 48px; height: 48px; border-radius: 50%; border: none;
+      background: rgba(139,92,246,0.22); backdrop-filter: blur(10px);
+      color: #a78bfa; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.14s;
+    }
+    #btn-ai-customer:hover { background: rgba(139,92,246,0.38); }
+    #btn-ai-customer svg { width: 22px; height: 22px; }
+
+    #ai-sheet {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      max-height: 78vh; z-index: 30;
+      background: rgba(11,11,14,0.97); backdrop-filter: blur(22px);
+      border-radius: 20px 20px 0 0;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+      display: flex; flex-direction: column;
+    }
+    #ai-sheet.open { transform: translateY(0); }
+    #ai-sheet-handle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 18px 10px; flex-shrink: 0;
+    }
+    #ai-sheet-handle span { font-size: 14px; font-weight: 600; color: #c4b5fd; }
+    #ai-sheet-close {
+      width: 28px; height: 28px; border-radius: 8px; border: none;
+      background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.45);
+      font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    #ai-sheet-body { overflow-y: auto; padding: 4px 16px 28px; display: flex; flex-direction: column; gap: 10px; }
+
+    .ai-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px 0; color: rgba(255,255,255,0.4); font-size: 13px; }
+    .ai-spinner { width: 26px; height: 26px; border: 2.5px solid rgba(196,181,253,0.2); border-top-color: #a78bfa; border-radius: 50%; animation: blink 0s, spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ai-error { color: #f87171; font-size: 13px; padding: 12px; background: rgba(239,68,68,0.08); border-radius: 10px; }
+    .ai-problem-box { background: rgba(139,92,246,0.09); border: 1px solid rgba(139,92,246,0.22); border-radius: 12px; padding: 12px 14px; }
+    .ai-section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
+    .ai-problem-box .ai-section-label { color: #a78bfa; }
+    .ai-problem-text { font-size: 13px; color: rgba(255,255,255,0.75); line-height: 1.55; }
+    .ai-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+    .ai-card-title { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+    .ai-card-desc  { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.5; }
+    .yt-link {
+      display: inline-flex; align-items: center; gap: 6px; margin-top: 4px;
+      padding: 7px 13px; border-radius: 8px;
+      background: rgba(255,0,0,0.12); border: 1px solid rgba(255,0,0,0.25);
+      color: #f87171; font-size: 12px; font-weight: 500; text-decoration: none;
+    }
+    .yt-link:hover { background: rgba(255,0,0,0.22); }
+
     #btn-mute {
       position: absolute; bottom: 20px; right: 20px; z-index: 10;
       width: 48px; height: 48px; border-radius: 50%; border: none;
@@ -66,6 +118,21 @@
     <span id="status-text">Starting camera…</span>
   </div>
   <div id="hint">Point camera at what you need help with</div>
+  <button id="btn-ai-customer" title="Get AI fix suggestions">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.4L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.6z"/><path d="M19 14l1 3 3 1-3 1-1 3-1-3-3-1 3-1z" opacity=".55"/><path d="M5 17l.7 2 2 .7-2 .7L5 23l-.7-2.6L2 19.4l2-.7z" opacity=".35"/></svg>
+  </button>
+
+  <div id="ai-sheet">
+    <div id="ai-sheet-handle">
+      <span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px;margin-right:5px"><path d="M12 2l1.8 5.4L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.6z"/></svg>
+        AI Assistant
+      </span>
+      <button id="ai-sheet-close">✕</button>
+    </div>
+    <div id="ai-sheet-body"></div>
+  </div>
+
   <button id="btn-mute" title="Mute microphone">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
@@ -418,6 +485,53 @@
 
   ws.onerror = () => setStatus('error', 'Connection error');
   ws.onclose = () => setStatus('error', 'Disconnected — please refresh');
+
+  // ── AI Assistant ──────────────────────────────────────────────────────────
+  const aiSheet = document.getElementById('ai-sheet');
+  const aiSheetBody = document.getElementById('ai-sheet-body');
+
+  document.getElementById('ai-sheet-close').addEventListener('click', () => aiSheet.classList.remove('open'));
+
+  document.getElementById('btn-ai-customer').addEventListener('click', async () => {
+    aiSheet.classList.add('open');
+    aiSheetBody.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div><p>Analysing the scene…</p></div>';
+
+    try {
+      const cap = document.createElement('canvas');
+      cap.width = video.videoWidth || 1280;
+      cap.height = video.videoHeight || 720;
+      cap.getContext('2d').drawImage(video, 0, 0);
+      const imageData = cap.toDataURL('image/jpeg', 0.82).replace(/^data:image\/jpeg;base64,/, '');
+
+      const r = await fetch('/ai-assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageData })
+      });
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+
+      const cards = (data.suggestions || []).map(s => `
+        <div class="ai-card">
+          <div class="ai-card-title">${s.title}</div>
+          <div class="ai-card-desc">${s.description}</div>
+          <a class="yt-link" href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.youtube)}" target="_blank">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M23 7s-.3-2-1.2-2.8c-1.1-1.2-2.4-1.2-3-1.3C16.2 2.8 12 2.8 12 2.8s-4.2 0-6.8.2c-.6.1-1.9.1-3 1.3C1.3 5 1 7 1 7S.7 9.1.7 11.3v2c0 2.1.3 4.2.3 4.2s.3 2 1.2 2.8c1.1 1.2 2.6 1.1 3.3 1.2C7.3 21.7 12 21.7 12 21.7s4.2 0 6.8-.3c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.8 1.2-2.8s.3-2.1.3-4.2v-2C23.3 9.1 23 7 23 7zm-13.5 8.5V8.2l8 3.7-8 3.6z"/></svg>
+            Watch on YouTube
+          </a>
+        </div>`).join('');
+
+      aiSheetBody.innerHTML = `
+        <div class="ai-problem-box">
+          <div class="ai-section-label">Problem identified</div>
+          <p class="ai-problem-text">${data.problem}</p>
+        </div>
+        <div class="ai-section-label">Suggested fixes</div>
+        ${cards}`;
+    } catch (e) {
+      aiSheetBody.innerHTML = `<div class="ai-error">⚠ ${e.message}</div>`;
+    }
+  });
 
   // ── Mute button ───────────────────────────────────────────────────────────
   let customerMicMuted = false;
