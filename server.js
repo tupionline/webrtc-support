@@ -1,14 +1,13 @@
-// Load .env in local development — split only on FIRST = so base64 values with = work
+// Load .env for local dev (Railway sets env vars via dashboard)
 try {
-  require('fs').readFileSync('.env', 'utf8').split('\n').forEach(l => {
-    const i = l.indexOf('=');
-    if (i > 0) {
-      const k = l.slice(0, i).trim();
-      const v = l.slice(i + 1).trim();
-      if (k && v && !k.startsWith('#')) process.env[k] = v;
-    }
+  require('fs').readFileSync('.env','utf8').split('\n').forEach(line => {
+    const i = line.indexOf('=');
+    if (i < 1 || line.trimStart().startsWith('#')) return;
+    const k = line.slice(0, i).trim();
+    const v = line.slice(i + 1).trim();
+    if (k && v && !process.env[k]) process.env[k] = v;
   });
-} catch {}
+} catch { /* no .env file — fine in production */ }
 
 const express = require('express');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -153,7 +152,9 @@ function getLocalIP() {
 
 server.listen(PORT, '0.0.0.0', () => {
   if (isProd) {
-    console.log(`\n✅  WebRTC Support Server running (production) on port ${PORT}\n`);
+    console.log(`\n✅  WebRTC Support Server running (production) on port ${PORT}`);
+    console.log(`  ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? '✓ set' : '✗ NOT SET — AI will not work'}`);
+    console.log(`  TURN: ${process.env.TURN_USERNAME ? '✓ set' : '✗ not set'}\n`);
   } else {
     const localIP = getLocalIP();
     console.log('\n✅  WebRTC Support Server running (local)\n');
