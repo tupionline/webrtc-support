@@ -55,7 +55,10 @@ Provide 3-4 suggestions. If no clear problem is visible, describe what you see a
       }]
     });
 
-    const result = JSON.parse(msg.content[0].text.trim());
+    let text = msg.content[0].text.trim();
+    // Strip markdown code fences Claude sometimes wraps around JSON
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const result = JSON.parse(text);
     res.json(result);
   } catch (e) {
     console.error(`[${ts()}] AI assist error:`, e.message);
