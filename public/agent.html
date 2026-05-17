@@ -671,8 +671,8 @@
     setStatus('connected', 'Customer connected');
   }
 
-  function buildPC() {
-    pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  function buildPC(iceConfig) {
+    pc = new RTCPeerConnection(iceConfig);
     pc.addTransceiver('video', { direction: 'recvonly' });
 
     if (micStream) {
@@ -725,12 +725,17 @@
 
   async function initiateCall() {
     if (pc) { pc.close(); pc = null; }
-    await micInitPromise; // ensure mic is ready before building PC
-    buildPC();
+    const [iceConfig] = await Promise.all([iceConfigPromise, micInitPromise]);
+    buildPC(iceConfig);
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     ws.send(JSON.stringify({ type: 'offer', offer }));
   }
+
+  // ── ICE config (STUN + TURN from server) ────────────────────────────────
+  const iceConfigPromise = fetch('/ice-config')
+    .then(r => r.json())
+    .catch(() => ({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }));
 
   // ── Signalling ────────────────────────────────────────────────────────────
   const micInitPromise = initMic(); // kick off early; awaited before call starts

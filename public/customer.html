@@ -325,8 +325,12 @@
   }
 
   // ── WebRTC (answerer) ─────────────────────────────────────────────────────
-  function buildPC(stream) {
-    pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  const iceConfigPromise = fetch('/ice-config')
+    .then(r => r.json())
+    .catch(() => ({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }));
+
+  function buildPC(stream, iceConfig) {
+    pc = new RTCPeerConnection(iceConfig);
     stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
     pc.ontrack = ({ track }) => {
@@ -393,7 +397,8 @@
     if (msg.type === 'peer-joined' && msg.role === 'agent') setStatus('waiting', 'Agent ready, connecting…');
     if (msg.type === 'offer') {
       if (pc) { pc.close(); pc = null; }
-      buildPC(stream);
+      const iceConfig = await iceConfigPromise;
+      buildPC(stream, iceConfig);
       await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
