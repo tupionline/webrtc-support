@@ -167,6 +167,30 @@
     .tb-btn.ai-btn:hover  { background: rgba(139,92,246,0.2); color: #a78bfa; }
     .tb-btn.ai-btn.active { background: rgba(139,92,246,0.22); color: #a78bfa; }
 
+    /* ── Customer activity card ── */
+    #activity-card {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      width: 360px; max-width: calc(100vw - 100px);
+      background: rgba(13,13,16,0.95); backdrop-filter: blur(18px);
+      border: 1px solid rgba(255,255,255,0.09); border-radius: 16px;
+      z-index: 12; overflow: hidden;
+      animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    #activity-card.hidden { display: none; }
+    @keyframes slideUp { from { opacity:0; transform: translateX(-50%) translateY(16px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+    #act-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px 8px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    #act-header span { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #a78bfa; }
+    #act-close { background: none; border: none; color: rgba(255,255,255,0.35); cursor: pointer; font-size: 14px; padding: 0 2px; }
+    #act-close:hover { color: #fff; }
+    #act-body { display: flex; gap: 12px; padding: 12px 14px 14px; align-items: flex-start; }
+    #act-thumb { width: 100px; height: 56px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: #111; }
+    #act-text { flex: 1; min-width: 0; }
+    #act-desc { font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.45; margin-bottom: 5px; word-break: break-word; }
+    #act-time { font-size: 11px; color: rgba(255,255,255,0.3); }
+
     /* ── Map panel ── */
     #map-panel {
       position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
@@ -268,6 +292,20 @@
     <h2>Waiting for customer</h2>
     <p>The customer will connect shortly…</p>
   </div>
+  <div id="activity-card" class="hidden">
+    <div id="act-header">
+      <span>📸 Customer snapshot</span>
+      <button id="act-close">✕</button>
+    </div>
+    <div id="act-body">
+      <img id="act-thumb" src="" alt="snapshot"/>
+      <div id="act-text">
+        <div id="act-desc"></div>
+        <div id="act-time"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="flash"></div>
 
   <div id="map-panel" class="hidden">
@@ -563,6 +601,19 @@
     document.getElementById('frozen-badge').classList.add('hidden');
   }
 
+  // ── Customer activity notification ───────────────────────────────────────
+  const actCard = document.getElementById('activity-card');
+  document.getElementById('act-close').addEventListener('click', () => actCard.classList.add('hidden'));
+
+  function showActivity({ description, thumbnail }) {
+    document.getElementById('act-thumb').src = thumbnail || '';
+    document.getElementById('act-desc').textContent = description || '(no description)';
+    document.getElementById('act-time').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Re-trigger animation
+    actCard.classList.add('hidden');
+    requestAnimationFrame(() => { actCard.classList.remove('hidden'); });
+  }
+
   function resetMap() {
     document.getElementById('map-panel').classList.add('hidden');
     if (leafletMap) { leafletMap.remove(); leafletMap = null; leafletMarker = null; }
@@ -809,7 +860,11 @@
     dataChannel.onopen  = () => {};
     dataChannel.onclose = () => {};
     dataChannel.onmessage = ({ data }) => {
-      try { const m = JSON.parse(data); if (m.type === 'gps') handleGPS(m); } catch {}
+      try {
+        const m = JSON.parse(data);
+        if (m.type === 'gps')               handleGPS(m);
+        if (m.type === 'customer-activity') showActivity(m);
+      } catch {}
     };
 
     pc.ontrack = ({ track }) => {
@@ -843,6 +898,7 @@
         tracker.reset();
         unfreeze();
         resetMap();
+        actCard.classList.add('hidden');
       }
     };
   }
@@ -883,6 +939,7 @@
       tracker.reset();
       unfreeze();
       resetMap();
+      actCard.classList.add('hidden');
       pc?.close(); pc = null;
     }
   };

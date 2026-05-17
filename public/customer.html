@@ -75,6 +75,24 @@
     }
     #ai-sheet-body { overflow-y: auto; padding: 4px 16px 28px; display: flex; flex-direction: column; gap: 10px; }
 
+    #ai-input-state { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 8px; }
+    #ai-input-state p { font-size: 13px; color: rgba(255,255,255,0.55); }
+    #customer-desc {
+      width: 100%; min-height: 90px; padding: 12px;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px; color: #fff; font-size: 14px; font-family: inherit;
+      resize: none; outline: none; line-height: 1.5;
+    }
+    #customer-desc:focus { border-color: rgba(139,92,246,0.5); }
+    #customer-desc::placeholder { color: rgba(255,255,255,0.25); }
+    #btn-capture-analyse {
+      width: 100%; padding: 13px; border-radius: 12px; border: none;
+      background: #7c3aed; color: #fff; font-size: 14px; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    #btn-capture-analyse:hover { background: #6d28d9; }
+    #btn-capture-analyse:disabled { opacity: 0.5; cursor: default; }
+
     .ai-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px 0; color: rgba(255,255,255,0.4); font-size: 13px; }
     .ai-spinner { width: 26px; height: 26px; border: 2.5px solid rgba(196,181,253,0.2); border-top-color: #a78bfa; border-radius: 50%; animation: blink 0s, spin .7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -487,26 +505,56 @@
   ws.onclose = () => setStatus('error', 'Disconnected — please refresh');
 
   // ── AI Assistant ──────────────────────────────────────────────────────────
-  const aiSheet = document.getElementById('ai-sheet');
+  const aiSheet     = document.getElementById('ai-sheet');
   const aiSheetBody = document.getElementById('ai-sheet-body');
 
   document.getElementById('ai-sheet-close').addEventListener('click', () => aiSheet.classList.remove('open'));
 
-  document.getElementById('btn-ai-customer').addEventListener('click', async () => {
+  // Step 1 — show description input
+  document.getElementById('btn-ai-customer').addEventListener('click', () => {
     aiSheet.classList.add('open');
-    aiSheetBody.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div><p>Analysing the scene…</p></div>';
+    aiSheetBody.innerHTML = `
+      <div id="ai-input-state">
+        <p>Briefly describe what's wrong, then capture the scene.</p>
+        <textarea id="customer-desc" placeholder="e.g. Water is leaking from under the sink…" rows="3"></textarea>
+        <button id="btn-capture-analyse">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Capture &amp; Analyse
+        </button>
+      </div>`;
+    document.getElementById('btn-capture-analyse').addEventListener('click', runAI);
+  });
+
+  // Step 2 — capture, notify agent, call AI
+  async function runAI() {
+    const description = (document.getElementById('customer-desc')?.value || '').trim();
+
+    // Capture frame at full res for AI
+    const fullCap = document.createElement('canvas');
+    fullCap.width = video.videoWidth || 1280;
+    fullCap.height = video.videoHeight || 720;
+    fullCap.getContext('2d').drawImage(video, 0, 0);
+    const imageData = fullCap.toDataURL('image/jpeg', 0.82).replace(/^data:image\/jpeg;base64,/, '');
+
+    // Capture small thumbnail to send to agent via data channel
+    const thumbCap = document.createElement('canvas');
+    thumbCap.width = 320; thumbCap.height = 180;
+    thumbCap.getContext('2d').drawImage(video, 0, 0, 320, 180);
+    const thumbnail = thumbCap.toDataURL('image/jpeg', 0.5);
+
+    // Send activity to agent immediately (before AI finishes)
+    if (customerChannel?.readyState === 'open') {
+      customerChannel.send(JSON.stringify({ type: 'customer-activity', description, thumbnail }));
+    }
+
+    // Switch to loading state
+    aiSheetBody.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div><p>Analysing…</p></div>';
 
     try {
-      const cap = document.createElement('canvas');
-      cap.width = video.videoWidth || 1280;
-      cap.height = video.videoHeight || 720;
-      cap.getContext('2d').drawImage(video, 0, 0);
-      const imageData = cap.toDataURL('image/jpeg', 0.82).replace(/^data:image\/jpeg;base64,/, '');
-
       const r = await fetch('/ai-assist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData })
+        body: JSON.stringify({ imageData, description })
       });
       const data = await r.json();
       if (data.error) throw new Error(data.error);
@@ -531,7 +579,7 @@
     } catch (e) {
       aiSheetBody.innerHTML = `<div class="ai-error">⚠ ${e.message}</div>`;
     }
-  });
+  }
 
   // ── Mute button ───────────────────────────────────────────────────────────
   let customerMicMuted = false;

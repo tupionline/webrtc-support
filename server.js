@@ -36,7 +36,7 @@ app.post('/ai-assist', async (req, res) => {
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageData } },
-          { type: 'text', text: `You are a remote technical support assistant. A customer is showing you their problem via camera.
+          { type: 'text', text: `You are a remote technical support assistant. A customer is showing you their problem via camera.${req.body.description ? `\n\nThe customer describes their issue as: "${req.body.description}"` : ''}
 
 Analyze this image and respond ONLY with valid JSON (no markdown, no extra text):
 {
