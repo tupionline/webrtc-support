@@ -118,6 +118,55 @@
     #flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 30; pointer-events: none; transition: opacity 0.08s; }
     #flash.pop { opacity: 0.75; }
 
+    /* ── AI panel ── */
+    #ai-panel {
+      position: absolute; right: 0; top: 0; height: 100%; width: 320px;
+      background: rgba(11,11,14,0.97); backdrop-filter: blur(22px);
+      border-left: 1px solid rgba(255,255,255,0.07);
+      z-index: 16; display: flex; flex-direction: column;
+      transform: translateX(100%); transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+    #ai-panel.open { transform: translateX(0); }
+
+    #ai-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 16px 12px; border-bottom: 1px solid rgba(255,255,255,0.07);
+      flex-shrink: 0;
+    }
+    #ai-header span { font-size: 14px; font-weight: 600; color: #c4b5fd; letter-spacing: 0.02em; }
+    #ai-close {
+      width: 28px; height: 28px; border-radius: 8px; border: none;
+      background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.45);
+      cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center;
+    }
+    #ai-close:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+    #ai-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+
+    .ai-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 14px; color: rgba(255,255,255,0.4); font-size: 13px; padding: 40px 0; }
+    .ai-spinner { width: 28px; height: 28px; border: 2.5px solid rgba(196,181,253,0.2); border-top-color: #a78bfa; border-radius: 50%; animation: spin .7s linear infinite; }
+    .ai-error { color: #f87171; font-size: 13px; padding: 12px; background: rgba(239,68,68,0.08); border-radius: 10px; }
+
+    .ai-section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; color: rgba(255,255,255,0.3); text-transform: uppercase; }
+    .ai-problem-box { background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.2); border-radius: 12px; padding: 12px 14px; }
+    .ai-problem-box .ai-section-label { color: #a78bfa; margin-bottom: 6px; }
+    .ai-problem-text { font-size: 13px; color: rgba(255,255,255,0.75); line-height: 1.55; }
+
+    .ai-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+    .ai-card-title { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+    .ai-card-desc  { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.5; }
+    .yt-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 4px; padding: 6px 12px; border-radius: 8px;
+      background: rgba(255,0,0,0.12); border: 1px solid rgba(255,0,0,0.25);
+      color: #f87171; font-size: 12px; font-weight: 500; text-decoration: none;
+      transition: background 0.14s;
+    }
+    .yt-link:hover { background: rgba(255,0,0,0.22); color: #fca5a5; }
+
+    .tb-btn.ai-btn:hover  { background: rgba(139,92,246,0.2); color: #a78bfa; }
+    .tb-btn.ai-btn.active { background: rgba(139,92,246,0.22); color: #a78bfa; }
+
     /* ── Map panel ── */
     #map-panel {
       position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
@@ -187,9 +236,24 @@
     <button class="tb-btn danger"  id="btn-clear"   title="Clear all drawings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
     </button>
+    <button class="tb-btn ai-btn" id="btn-ai" title="AI problem analysis">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="19" height="19"><path d="M12 2l1.8 5.4L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.6z"/><path d="M19 14l1 3 3 1-3 1-1 3-1-3-3-1 3-1z" opacity=".55"/><path d="M5 17l.7 2 2 .7-2 .7L5 23l-.7-2.6L2 19.4l2-.7z" opacity=".35"/></svg>
+    </button>
+
     <button class="tb-btn capture" id="btn-capture" title="Capture & download photo">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
     </button>
+  </div>
+
+  <div id="ai-panel">
+    <div id="ai-header">
+      <span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px;margin-right:6px"><path d="M12 1l2 6h6l-5 3.6 1.9 6L12 13l-4.9 3.6L9 10.6 4 7h6z"/></svg>
+        AI Assistant
+      </span>
+      <button id="ai-close">✕</button>
+    </div>
+    <div id="ai-body"></div>
   </div>
 
   <div id="frozen-badge" class="hidden"><div class="fpulse"></div>FROZEN</div>
@@ -629,6 +693,66 @@
       btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
     }
   });
+
+  // ── AI Assistant ──────────────────────────────────────────────────────────
+  const aiPanel = document.getElementById('ai-panel');
+  const aiBody  = document.getElementById('ai-body');
+
+  document.getElementById('ai-close').addEventListener('click', () => {
+    aiPanel.classList.remove('open');
+    document.getElementById('btn-ai').classList.remove('active');
+  });
+
+  document.getElementById('btn-ai').addEventListener('click', async () => {
+    if (!video.srcObject) return;
+
+    // Auto-freeze so agent sees exactly what Claude is analysing
+    if (!frozen) document.getElementById('btn-freeze').click();
+
+    aiPanel.classList.add('open');
+    document.getElementById('btn-ai').classList.add('active');
+    aiBody.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div><p>Analysing the scene…</p></div>';
+
+    try {
+      // Capture frame at native video resolution
+      const cap = document.createElement('canvas');
+      cap.width = video.videoWidth || 1280;
+      cap.height = video.videoHeight || 720;
+      cap.getContext('2d').drawImage(video, 0, 0);
+      const imageData = cap.toDataURL('image/jpeg', 0.85).replace(/^data:image\/jpeg;base64,/, '');
+
+      const r = await fetch('/ai-assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageData })
+      });
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+      renderAIResults(data);
+    } catch (e) {
+      aiBody.innerHTML = `<div class="ai-error">⚠ ${e.message}</div>`;
+    }
+  });
+
+  function renderAIResults({ problem, suggestions = [] }) {
+    const cards = suggestions.map(s => `
+      <div class="ai-card">
+        <div class="ai-card-title">${s.title}</div>
+        <div class="ai-card-desc">${s.description}</div>
+        <a class="yt-link" href="https://www.youtube.com/results?search_query=${encodeURIComponent(s.youtube)}" target="_blank">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M23 7s-.3-2-1.2-2.8c-1.1-1.2-2.4-1.2-3-1.3C16.2 2.8 12 2.8 12 2.8s-4.2 0-6.8.2c-.6.1-1.9.1-3 1.3C1.3 5 1 7 1 7S.7 9.1.7 11.3v2c0 2.1.3 4.2.3 4.2s.3 2 1.2 2.8c1.1 1.2 2.6 1.1 3.3 1.2C7.3 21.7 12 21.7 12 21.7s4.2 0 6.8-.3c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.8 1.2-2.8s.3-2.1.3-4.2v-2C23.3 9.1 23 7 23 7zm-13.5 8.5V8.2l8 3.7-8 3.6z"/></svg>
+          Watch on YouTube
+        </a>
+      </div>`).join('');
+
+    aiBody.innerHTML = `
+      <div class="ai-problem-box">
+        <div class="ai-section-label">Problem identified</div>
+        <p class="ai-problem-text">${problem}</p>
+      </div>
+      <div class="ai-section-label">Suggested fixes</div>
+      ${cards}`;
+  }
 
   document.getElementById('btn-mic').addEventListener('click', () => {
     agentMicMuted = !agentMicMuted;

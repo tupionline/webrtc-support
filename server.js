@@ -2,12 +2,58 @@
 try { require('fs').readFileSync('.env', 'utf8').split('\n').forEach(l => { const [k,v] = l.split('='); if (k && v) process.env[k.trim()] = v.trim(); }); } catch {}
 
 const express = require('express');
+const Anthropic = require('@anthropic-ai/sdk');
 const { WebSocketServer } = require('ws');
 const path = require('path');
 const os = require('os');
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json({ limit: '8mb' }));
+
+// ── AI assist endpoint ────────────────────────────────────────────────────────
+app.post('/ai-assist', async (req, res) => {
+  if (!process.env.ANTHROPIC_API_KEY)
+    return res.status(503).json({ error: 'AI not configured — set ANTHROPIC_API_KEY' });
+
+  const { imageData } = req.body;
+  if (!imageData) return res.status(400).json({ error: 'No image provided' });
+
+  try {
+    const client = new Anthropic();
+    const msg = await client.messages.create({
+      model: 'claude-opus-4-5',
+      max_tokens: 1024,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageData } },
+          { type: 'text', text: `You are a remote technical support assistant. A customer is showing you their problem via camera.
+
+Analyze this image and respond ONLY with valid JSON (no markdown, no extra text):
+{
+  "problem": "What you see and the likely issue (2-3 sentences)",
+  "suggestions": [
+    {
+      "title": "Short fix title",
+      "description": "One practical sentence of advice",
+      "youtube": "search terms for a helpful YouTube tutorial"
+    }
+  ]
+}
+
+Provide 3-4 suggestions. If no clear problem is visible, describe what you see and suggest diagnostic steps.` }
+        ]
+      }]
+    });
+
+    const result = JSON.parse(msg.content[0].text.trim());
+    res.json(result);
+  } catch (e) {
+    console.error(`[${ts()}] AI assist error:`, e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ── ICE config endpoint — keeps TURN credentials off the client bundle ──────
 app.get('/ice-config', (req, res) => {
