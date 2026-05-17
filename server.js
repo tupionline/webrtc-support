@@ -1,3 +1,6 @@
+// Load .env in local development (not present on Railway — vars set via dashboard)
+try { require('fs').readFileSync('.env', 'utf8').split('\n').forEach(l => { const [k,v] = l.split('='); if (k && v) process.env[k.trim()] = v.trim(); }); } catch {}
+
 const express = require('express');
 const { WebSocketServer } = require('ws');
 const path = require('path');
